@@ -1,30 +1,121 @@
-name: WNBA CBA Daily Quiz
+name: Daily WNBA CBA Quiz
 
 on:
   schedule:
-    - cron: '30 13 * * *'  # 6:30am PT (UTC-7) = 13:30 UTC
-  workflow_dispatch:        # allows manual trigger from GitHub UI
+    - cron: '30 13 * * *'  # 6:30 AM PT (PDT = UTC-7)
+  workflow_dispatch:  # allows manual trigger
 
 jobs:
-  run-quiz:
+  send-quiz:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Run quiz script
+      - name: Send daily quiz
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
-        run: python wnba_quiz.py
+        run: |
+          pip install anthropic --quiet
+          python3 << 'PYEOF'
+          import anthropic, smtplib, os, json
+          from datetime import datetime
+          from email.mime.multipart import MIMEMultipart
+          from email.mime.text import MIMEText
+
+          client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+          prompt = """Using the 2026 WNBA CBA, generate 10 quiz questions for an experienced WNBA front office professional.
+
+          DISTRIBUTION: Article V (3 questions), Article VI (2), Article VII (2), Article X (1), Article XIV (1), rotating from Arts I/VIII/IX/XIII/XV/XX/XXXIII (1).
+          FORMAT: 8 multiple choice + 2 true/false. DIFFICULTY: Advanced — specific dollar figures, thresholds, edge cases, 2026 changes.
+
+          Return ONLY a JSON array of 10 objects, each with: question, type (multiple_choice or true_false), options (array of 4 for MC), correct_answer (A/B/C/D; T/F: A=True B=False), explanation (1-3 sentences with article/section), article (e.g. Art. V §3)"""
+
+          message = client.messages.create(
+              model="claude-sonnet-4-20250514",
+              max_tokens=3000,
+              system="Output ONLY valid JSON array. No markdown, no preamble.",
+              messages=[{"role": "user", "content": prompt}]
+          )
+
+          questions = json.loads(message.content[0].text)
+          date_str = datetime.now().strftime("%A, %B %-d, %Y")
+
+          def build_html(questions, date_str):
+              blocks = ""
+              for i, q in enumerate(questions):
+                  is_tf = q["type"] == "true_false"
+                  opts = [("A","True"),("B","False")] if is_tf else [(chr(65+j), o) for j,o in enumerate(q.get("options",[]))]
+                  opt_html = "".join(f'<div class="opt" data-val="{l}" onclick="pick(this,{i})"><span class="ol">{l}</span><span class="ot">{t}</span></div>' for l,t in opts)
+                  blocks += f'<div class="qc" id="qc{i}"><div class="qm"><span class="qn">Q{i+1}</span><span class="qa">{q.get("article","")}</span><span class="qt">{"T/F" if is_tf else "4-choice"}</span></div><div class="qtx">{q["question"]}</div><div class="opts">{opt_html}</div><div class="exp" id="exp{i}"><div class="el">CBA Reference</div>{q["explanation"]}</div></div>'
+
+              answers_json = json.dumps([q["correct_answer"] for q in questions])
+
+              return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>WNBA CBA Quiz — {date_str}</title>
+          <style>
+          *{{box-sizing:border-box;margin:0;padding:0}}
+          body{{font-family:-apple-system,sans-serif;background:#f5f5f5;padding-bottom:60px}}
+          .hdr{{background:#000;padding:24px 20px 0}}
+          .ht{{font-size:26px;font-weight:700;color:#fff}}.ht span{{color:#c8102e}}
+          .hs{{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#ff0099;margin-bottom:6px}}
+          .hd{{font-size:11px;color:#555;margin-top:4px}}
+          .sb{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#222;margin-top:16px}}
+          .sc{{background:#111;padding:12px;text-align:center}}
+          .sn{{font-size:22px;font-weight:700;color:#fff}}.sn.hi{{color:#ff0099}}
+          .sl{{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:3px}}
+          .wrap{{padding:16px;max-width:600px;margin:0 auto}}
+          .qc{{background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:18px;margin-bottom:12px}}
+          .qm{{display:flex;align-items:center;gap:7px;margin-bottom:12px}}
+          .qn{{background:#c8102e;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px}}
+          .qa{{background:#f5f5f5;color:#555;font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e8e8e8}}
+          .qt{{margin-left:auto;font-size:10px;color:#bbb;text-transform:uppercase}}
+          .qtx{{font-size:15px;line-height:1.55;color:#111;font-weight:500;margin-bottom:14px}}
+          .opts{{display:flex;flex-direction:column;gap:7px}}
+          .opt{{display:flex;align-items:flex-start;gap:11px;padding:11px 13px;border:1px solid #e8e8e8;border-radius:8px;cursor:pointer;background:#fafafa}}
+          .opt.sel{{border-color:#c8102e;background:#fff8f8}}
+          .opt.cor{{border-color:#273103;background:#f5f7f0;cursor:default}}
+          .opt.inc{{border-color:#ffd0d0;background:#fff5f5;cursor:default}}
+          .opt.shc{{border-color:#273103;background:#f5f7f0;cursor:default}}
+          .ol{{font-size:11px;font-weight:700;color:#bbb;min-width:14px;padding-top:1px}}
+          .opt.sel .ol{{color:#c8102e}}.opt.cor .ol{{color:#273103}}.opt.inc .ol{{color:#c8102e}}.opt.shc .ol{{color:#273103}}
+          .ot{{font-size:14px;line-height:1.45;color:#333}}
+          .opt.cor .ot{{color:#273103;font-weight:600}}.opt.inc .ot{{color:#c8102e;text-decoration:line-through}}.opt.shc .ot{{color:#273103;font-weight:600}}
+          .exp{{display:none;margin-top:12px;padding:12px 14px;background:#f9f9f0;border-left:3px solid #273103;border-radius:0 7px 7px 0;font-size:13px;line-height:1.65;color:#444}}
+          .exp.show{{display:block}}.el{{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#273103;margin-bottom:5px}}
+          .fb{{display:none;padding:4px 0 8px}}.fb.show{{display:block}}
+          .fb button{{width:100%;padding:18px;background:#000;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit}}
+          .rc{{display:none;background:#000;border-radius:12px;padding:32px 24px;text-align:center;margin-top:4px}}
+          .rc.show{{display:block}}
+          .rs{{font-size:64px;font-weight:700;color:#fff}}.rs span{{color:#ff0099}}
+          .rm{{font-size:15px;color:#888;margin-top:12px}}
+          .nb{{margin-top:24px;padding:14px 28px;background:transparent;color:#cee5eb;border:1.5px solid #cee5eb;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}}
+          </style></head>
+          <body>
+          <div class="hdr"><div class="hs">Daily training</div><div class="ht">WNBA <span>CBA</span> Quiz</div><div class="hd">{date_str}</div>
+          <div class="sb"><div class="sc"><div class="sn hi" id="sc">0</div><div class="sl">Correct</div></div><div class="sc"><div class="sn" id="sa">0</div><div class="sl">Done</div></div><div class="sc"><div class="sn" id="sl">10</div><div class="sl">Left</div></div></div></div>
+          <div class="wrap">{blocks}
+          <div class="fb" id="fb"><button onclick="finish()">See My Score</button></div>
+          <div class="rc" id="rc"><div class="rs" id="rs"></div><div class="rm" id="rm"></div><button class="nb" onclick="location.reload()">New Quiz</button></div>
+          </div>
+          <script>
+          const A={answers_json},T=10;let done=new Set(),cc=0;
+          function pick(el,i){{if(done.has(i))return;done.add(i);const c=el.dataset.val,r=A[i];document.getElementById("qc"+i).querySelectorAll(".opt").forEach(o=>{{o.onclick=null;if(o.dataset.val===r)o.classList.add(c===r?"cor":"shc")}});if(c===r){{el.classList.add("cor");cc++;}}else el.classList.add("inc");document.getElementById("exp"+i).classList.add("show");upd();if(done.size===T){{const f=document.getElementById("fb");f.classList.add("show");setTimeout(()=>f.scrollIntoView({{behavior:"smooth",block:"nearest"}}),300);}}}}
+          function upd(){{document.getElementById("sc").textContent=cc;document.getElementById("sa").textContent=done.size;document.getElementById("sl").textContent=T-done.size;}}
+          function finish(){{const p=Math.round(cc/T*100),msgs=[[100,"Perfect. You know this CBA cold."],[90,"Excellent — nearly flawless."],[80,"Strong. A few edges to sharpen."],[70,"Solid. Review what you missed."],[60,"Getting there — keep grinding."],[0,"Use the explanations to level up."]],m=msgs.find(x=>p>=x[0])[1];document.getElementById("rs").innerHTML=cc+"<span>/"+T+"</span>";document.getElementById("rm").textContent=m;document.getElementById("rc").classList.add("show");document.getElementById("fb").classList.remove("show");setTimeout(()=>document.getElementById("rc").scrollIntoView({{behavior:"smooth"}}),100);}}
+          </script></body></html>"""
+
+          html = build_html(questions, date_str)
+
+          msg = MIMEMultipart("alternative")
+          msg["Subject"] = f"WNBA CBA Quiz — {date_str}"
+          msg["From"] = os.environ["GMAIL_ADDRESS"]
+          msg["To"] = "benpickman@yahoo.com"
+          msg.attach(MIMEText(html, "html"))
+
+          with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
+              s.login(os.environ["GMAIL_ADDRESS"], os.environ["GMAIL_APP_PASSWORD"])
+              s.send_message(msg)
+
+          print("Quiz sent successfully!")
+          PYEOF
