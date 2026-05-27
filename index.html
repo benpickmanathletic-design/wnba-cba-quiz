@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>WNBA CBA Daily Quiz</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d1a;
+    --card: #16162a;
+    --card2: #1e1e35;
+    --accent: #ff6b35;
+    --accent2: #c084fc;
+    --correct: #22c55e;
+    --incorrect: #ef4444;
+    --revealed: #3b82f6;
+    --text: #f0f0f0;
+    --muted: #8080a0;
+    --border: #2a2a45;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "DM Sans", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0 0 60px 0;
+  }
+  .header {
+    background: linear-gradient(160deg, #1a0a2e 0%, #0d0d1a 60%);
+    padding: 32px 20px 24px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: "🏀";
+    position: absolute;
+    font-size: 120px;
+    opacity: 0.04;
+    right: -10px;
+    top: -20px;
+  }
+  .header h1 {
+    font-family: "DM Serif Display", serif;
+    font-size: 28px;
+    letter-spacing: -0.5px;
+    color: white;
+  }
+  .header h1 span { color: var(--accent); }
+  .header .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .scorebar {
+    display: flex;
+    gap: 0;
+    margin: 16px 20px 0;
+    background: var(--card2);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .score-cell {
+    flex: 1;
+    padding: 12px 8px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+  }
+  .score-cell:last-child { border-right: none; }
+  .score-num {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent2);
+    line-height: 1;
+  }
+  .score-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-top: 3px;
+  }
+  .container { padding: 0 16px; }
+
+  /* Loading state */
+  .loading-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    gap: 20px;
+  }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text {
+    font-size: 15px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+  }
+  .loading-text strong { color: var(--text); display: block; font-size: 17px; margin-bottom: 4px; }
+
+  /* Error state */
+  .error-screen {
+    display: none;
+    padding: 40px 20px;
+    text-align: center;
+  }
+  .error-screen h2 { color: var(--incorrect); margin-bottom: 12px; }
+  .error-screen p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .retry-btn {
+    margin-top: 20px;
+    padding: 14px 28px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: "DM Sans", sans-serif;
+  }
+
+  /* Quiz */
+  .quiz-screen { display: none; }
+  .q-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 14px;
+    transition: border-color 0.2s;
+  }
+  .q-card.answered { border-color: var(--border); }
+  .q-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .q-num {
+    background: var(--accent);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+    letter-spacing: 0.3px;
+  }
+  .q-article {
+    background: var(--card2);
+    color: var(--accent2);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 6px;
+  }
+  .q-type {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .q-text {
+    font-size: 15px;
+    line-height: 1.55;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: #e8e8f0;
+  }
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .opt {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 13px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--card2);
+  }
+  .opt:active { transform: scale(0.98); }
+  .opt.selected { border-color: var(--accent2); background: #2a1a3e; }
+  .opt.correct { border-color: var(--correct); background: #0f2a1a; }
+  .opt.incorrect { border-color: var(--incorrect); background: #2a0f0f; }
+  .opt.show-correct { border-color: var(--revealed); background: #0f1a2a; }
+  .opt-letter {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    min-width: 16px;
+    padding-top: 1px;
+  }
+  .opt.correct .opt-letter { color: var(--correct); }
+  .opt.incorrect .opt-letter { color: var(--incorrect); }
+  .opt.show-correct .opt-letter { color: var(--revealed); }
+  .opt-text { font-size: 14px; line-height: 1.45; color: #d0d0e8; }
+  .explanation {
+    display: none;
+    margin-top: 14px;
+    padding: 13px 15px;
+    background: #1a1a10;
+    border-left: 3px solid #f59e0b;
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #c8c8a0;
+  }
+  .explanation.show { display: block; }
+  .exp-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #f59e0b;
+    margin-bottom: 5px;
+  }
+
+  /* Finish */
+  .finish-wrap {
+    padding: 20px 0 0;
+    display: none;
+  }
+  .finish-wrap.show { display: block; }
+  .finish-btn {
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    font-family: "DM Sans", sans-serif;
+    letter-spacing: 0.2px;
+  }
+  .result-card {
+    display: none;
+    margin-top: 16px;
+    background: linear-gradient(135deg, #1a0a2e, #0d1a2e);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 20px;
+    text-align: center;
+  }
+  .result-card.show { display: block; }
+  .result-big {
+    font-family: "DM Serif Display", serif;
+    font-size: 64px;
+    color: white;
+    line-height: 1;
+  }
+  .result-big span { color: var(--accent); }
+  .result-msg {
+    margin-top: 12px;
+    font-size: 16px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .new-quiz-btn {
+    margin-top: 20px;
+    padding: 14px 28px;
+    background: transparent;
+    color: var(--accent2);
+    border: 1.5px solid var(--accent2);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: "DM Sans", sans-serif;
+  }
+
+  /* API key prompt */
+  .apikey-screen {
+    display: none;
+    padding: 32px 20px;
+  }
+  .apikey-screen h2 {
+    font-family: "DM Serif Display", serif;
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
+  .apikey-screen p {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .apikey-screen a { color: var(--accent2); }
+  .apikey-input {
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--card2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: "DM Sans", sans-serif;
+    margin-bottom: 12px;
+  }
+  .apikey-input:focus { outline: none; border-color: var(--accent2); }
+  .save-key-btn {
+    width: 100%;
+    padding: 15px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: "DM Sans", sans-serif;
+  }
+  .key-note {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>WNBA <span>CBA</span> Quiz</h1>
+  <div class="subtitle" id="date-display">Daily training for front office pros</div>
+  <div class="scorebar" id="scorebar" style="display:none">
+    <div class="score-cell"><div class="score-num" id="s-correct">0</div><div class="score-label">Correct</div></div>
+    <div class="score-cell"><div class="score-num" id="s-answered">0</div><div class="score-label">Done</div></div>
+    <div class="score-cell"><div class="score-num" id="s-left">10</div><div class="score-label">Left</div></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- API Key screen -->
+  <div class="apikey-screen" id="apikey-screen">
+    <h2>One-time setup</h2>
+    <p>Enter your Anthropic API key to generate quizzes. It's saved only on this device — never sent anywhere except Anthropic's API.<br><br>Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+    <input class="apikey-input" id="apikey-input" type="password" placeholder="sk-ant-..." />
+    <button class="save-key-btn" onclick="saveKey()">Save & Generate Quiz</button>
+    <div class="key-note">Stored in your browser's local storage only</div>
+  </div>
+
+  <!-- Loading screen -->
+  <div class="loading-screen" id="loading-screen" style="display:none">
+    <div class="spinner"></div>
+    <div class="loading-text">
+      <strong>Generating today's quiz...</strong>
+      Pulling from the 2026 WNBA CBA
+    </div>
+  </div>
+
+  <!-- Error screen -->
+  <div class="error-screen" id="error-screen">
+    <h2>Something went wrong</h2>
+    <p id="error-msg">Failed to generate quiz. Check your API key and try again.</p>
+    <button class="retry-btn" onclick="retryOrReset()">Try Again</button>
+  </div>
+
+  <!-- Quiz screen -->
+  <div class="quiz-screen" id="quiz-screen"></div>
+
+  <!-- Finish -->
+  <div class="finish-wrap" id="finish-wrap">
+    <button class="finish-btn" onclick="finishQuiz()">See My Score</button>
+  </div>
+  <div class="result-card" id="result-card">
+    <div class="result-big" id="result-big"></div>
+    <div class="result-msg" id="result-msg"></div>
+    <button class="new-quiz-btn" onclick="startFresh()">Generate New Quiz</button>
+  </div>
+
+</div>
+
+<script>
+const CBA_REF = "=== Art_V ===\nARTICLE V\nSTANDARD PLAYER CONTRACT\nSection 1.\n\nRequired Form.\nThe contract to be entered into by each player and the Team by which she is\n\nemployed shall be a Standard Player Contract in the form annexed hereto as Exhibit 1.\nSection 2.\n\nLimitation on Amendments.\n(a)\n\nExcept as provided in Sections 3, 9, 10, 11, and 12 of this Article and in\n\nArticle VII, Section 5, no amendments of any kind to the form or the terms of the Standard\nPlayer Contract provided for by Section 1 of this Article shall be permitted.\n(b)\n\nIf a Team and a player enter into (i) a Standard Player Contract containing\n\nan amendment not specifically permitted by this Agreement or (ii) a subsequent amendment to\nan existing Player Contract when such amendment is not specifically permitted by this\nAgreement, then such Contract or subsequent amendment, as the case may be, shall be\ndisapproved by the Commissioner and rendered null and void.\n(c)\n\nOnce executed by the player and the Team, a Player Contract may not be\n\namended or changed in any manner except pursuant to Section 3(e), (g)(iii) below or Article VII,\nSection 5.\n(d)\n\nNotwithstanding anything to the contrary in this Section 2, a player may\n\nunilaterally change the form of the Standard Player Contract by deleting paragraph 6(d) thereof\nin its entirety.\nSection 3.\n\nAllowable Amendments.\nIn their individual contract negotiations, a Veteran Player (but not a Rookie) and a\n\nTeam may amend the provisions of a Standard Player Contract, but only in the following\nrespects:\n20\n\n\n(a)\n\nBy agreeing upon provisions (to be set forth in Exhibit 1 to a Standard\n\nPlayer Contract) setting forth the Base Salary to be paid to the player for each Season of the\nContract for rendering the services described in such Contract.\n(b)\n\nBy agreeing upon provisions (to be set forth in Exhibit 2 to a Standard\n\nPlayer Contract) stating that the Base Salary provided for by the Standard Player Contract shall\nbe, in whole or in part, and subject to any conditions or limitations, protected in the event that the\nContract is terminated by the Team by reason of the player\u2019s: (i) lack of skill; (ii) disability or\nunfitness to play skilled basketball resulting from a basketball-related injury (\u201cbasketball-related\ninjury\u201d); (iii) disability or unfitness to play skilled basketball resulting from any injury or illness\nsuffered by the player during a WNBA Season (\u201cin-Season injury or illness\u201d); (iv) disability or\nunfitness to play skilled basketball resulting from an\n\n=== Art_VI ===\nARTICLE VI\nFREE AGENCY\nSection 1.\n\nGeneral Rules.\n(a)\n\nSubject to the provisions of Article VII, (i) a Reserved Player is free at any\n\ntime beginning on February 4 to negotiate a Player Contract with her Prior Team and to accept a\nReserved Qualifying Offer from her Prior Team, and is free at any time beginning on the day\nfollowing the last day of the Moratorium Period to enter into a Player Contract with her Prior\nTeam; (ii) an Unrestricted Free Agent is free at any time beginning on February 4 to negotiate,\nand free at any time beginning on the day following the last day of the Moratorium Period to\nenter into, a Player Contract with any Team; (iii) a Restricted Free Agent is free at any time\nbeginning on February 4 to negotiate a Player Contract with her Prior Team, to accept a\nRestricted Qualifying Offer from her Prior Team, and to negotiate an Offer Sheet with any Team\nother than her Prior Team, and is free at any time beginning on the day following the last day of\nthe Moratorium Period to enter into a Player Contract with her Prior Team or an Offer Sheet with\nany Team other than her Prior Team; and (iv) a Core Player is free at any time beginning on\nFebruary 4 to negotiate a Player Contract with her Prior Team or to accept a Core Qualifying\nOffer from her Prior Team, and is free at any time beginning on the day following the last day of\nthe Moratorium Period to enter into a Player Contract with her Prior Team.\n(b)\n\nNo compensation obligation of any kind to another Team shall be\n\napplicable to any Free Agent. No right of first refusal (\u201cRight of First Refusal\u201d) shall be\napplicable to any Free Agent other than a Restricted Free Agent.\n\n61\n\n\nSection 2.\n\nNo Individually-Negotiated Right of First Refusal.\n(a)\n\nNo Player Contract, or any Extension or other amendment of a Player\n\nContract may include any individually negotiated Right of First Refusal or other limitation on\nplayer movement following the last Salary Cap Year covered by such Player Contract.\n(b)\n\nNo Right of First Refusal rule, practice, policy, regulation or agreement\n\nproviding for a Right of First Refusal shall be applied to any player as a result of that player\u2019s\nentry into a player contract with or the playing with any team in any professional basketball\nleague other than the WNBA.\nSection 3.\n\nWithholding Services.\nA player who withholds playing services called for by a Player Contract for more\n\nthan twenty-one (21) days during the last Season covered by her Player Contract o\n\n=== Art_VII ===\nARTICLE VII\nSALARY CAP, GUARANTEE PAYMENTS, AND MINIMUM TEAM SALARY\nSection 1.\n\nAmount of Salary Cap, Guarantee Payments and Minimum Team Salary.\n(a)\n\nSalary Cap.\nThe Salary Cap for the 2026 Salary Cap Year shall be $7,000,000.\n\nFor each subsequent Salary Cap Year during the term of this Agreement, the Salary Cap shall\nequal (1) the Designated 20% Share of SBR for the applicable Salary Cap Year, minus Salary\nCap Benefits for the applicable Salary Cap Year, plus the Upward Adjustment Amount for the\nimmediately preceding Salary Cap Year (if any), minus the Downward Adjustment Amount for\nthe immediately preceding Salary Cap Year (if any), divided by (2) the total number of Teams\nparticipating in the WNBA in the Season covered by the applicable Salary Cap Year.\nNotwithstanding anything to the contrary in Section 1(a)(i) above,\n(1) the Salary Cap for the 2027 Salary Cap Year shall not increase or decrease by more than\nthirteen percent (13%) from the Salary Cap for the 2026 Salary Cap Year, and (2) the Salary Cap\nfor each Salary Cap Year following the 2027 Salary Cap Year shall not increase or decrease by\nmore than ten percent (10%) of the Salary Cap for the Salary Cap Year immediately preceding\nsuch Salary Cap Year.\n(b)\n\nGuarantee Payments to Players.\nIn the event that the Salary Cap for a Salary Cap Year would have\n\nincreased by more than ten percent (10%) of the Salary Cap for the Salary Cap Year immediately\npreceding such Salary Cap Year (or, with respect to the Salary Cap for the 2027 Salary Cap\nYear, by more than thirteen percent (13%) from the Salary Cap for the 2026 Salary Cap Year)\nbut for the operation of Section 1(a)(ii) above, then the \u201cSalary Cap Limit Shortfall\u201d for such\nSalary Cap Year shall be the additional amount by which the Salary Cap would have increased\n80\n\n\nbut for the operation of Section 1(a)(ii) above (i.e., the amount in excess of a ten percent (10%),\nor thirteen percent (13%), increase, as applicable) multiplied by the total number of Teams\nparticipating in the WNBA in the Season covered by such Salary Cap Year.\nIn the event that, as of the conclusion of a Season covered by a\nSalary Cap Year, (A) Total Salaries for such Salary Cap Year is less than (B) the Salary Cap for\nsuch Salary Cap Year multiplied by the total number of Teams participating in the WNBA in\nsuch Season, then the \u201cGuarantee Shortfall\u201d for such Salary Cap Year shall equal the amount of\nthe shortfall.\nThe WNBA shall be obligated to pay the sum of the Sa\n\n=== Art_X ===\nARTICLE X\nBENEFITS\nSection 1.\n\nHealth Insurance.\n(a)\n\nMedical Coverage.\n\nDuring each Season covered by this Agreement, each player who is a party to a\nStandard Player Contract or a Player Development Contract (and such player\u2019s eligible\ndependents, if applicable) will be provided with medical benefits for the period beginning on the\nfirst day of training camp and ending on the day such Contract expires or is terminated; provided\nthat, (x) a player whose Standard Player Contract is terminated prior to the Mid-Point of the\nRegular Season will continue to receive medical benefits for a period of thirty (30) days\nfollowing contract termination, at the conclusion of which the player will be provided with a\nnotice of COBRA rights, and (y) a player whose Standard Player Contract is terminated after the\nMid-Point of the Regular Season will continue to receive medical benefits until the end of the\ncalendar year, at the conclusion of which the player would be provided with a notice of COBRA\nrights. The eligibility requirements, circumstances under which benefits may be terminated, and\nthe nature of the benefits will be set forth in summaries that will be distributed by the WNBA to\neach player signed to a Contract and to the Players Association.\nFor the 2026 Season, subject to any conditions and limitations\ncontained in the plan, the medical plan provides that players will receive both (A) in-network\nservices with a copayment for certain services, a $600 annual deductible \n\n=== Art_XIV ===\nARTICLE XIV\nPLAYER CONDUCT AND DISCIPLINE\nSection 1.\n\nPlayer Obligations.\nPlayers shall at all times conform their conduct to standards of good citizenship,\n\ngood moral character, and good sportsmanship and shall not do anything detrimental or\nprejudicial to the best interests of the WNBA, their Teams, or the sport of basketball. Without\nlimiting the foregoing, players shall also be required at all times to comply with all terms and\nprovisions of this Agreement; to perform all services required under their Standard Player\nContracts or any WNBA Marketing and Promotional Agreements; to comply at all times with all\napplicable federal, state, and local laws; to be neatly attired and present a professional\nappearance when in public (including all player appearances, travel days, and travel to and from\nthe arena); and to follow all reasonable rules and regulations of the WNBA and their Teams\npromulgated in accordance with this Agreement. For avoidance of doubt, any player who\npublicly expresses a desire to be traded to another Team shall be in violation of this Section 1.\nSection 2.\n\nPlayer Discipline.\n(a)\n\nIn addition to any other rights it has under this Agreement and the\n\nStandard Player Contract, the WNBA and/or a Team may impose reasonable discipline on a\nplayer for any act or omission that fails to conform to the requirements set forth in Section 1\nabove. Such discipline may include reasonable fines and/or suspensions.\n(b)\n\nThe WNBA and the Team shall not disc\n\n=== Art_XIII ===\nARTICLE XIII\nPLAYER ELIGIBILITY AND WNBA DRAFT\nSection 1.\n\nPlayer Eligibility.\n(a)\n\nOnly players who are women are eligible to play in the WNBA.\n\n(b)\n\nA player is eligible to be selected in the WNBA Draft if she: (i) will be at\n\nleast twenty-two (22) years old during the calendar year in which such Draft is held and she\neither has no remaining intercollegiate eligibility or renounces her remaining intercollegiate\neligibility by written notice to the WNBA at least ten (10) days prior to such Draft; (ii) has\ngraduated from a four-year college or university prior to such Draft, or \u201cis to graduate\u201d from\nsuch college or university within the three (3)-month period following such Draft and she either\nhas no remaining intercollegiate eligibility or renounces her remaining intercollegiate eligibility\nby written notice to the WNBA at least ten (10) days prior to such Draft or (iii) attended a fouryear college or university, her original class in such college or university has already been\ngraduated or \u201cis to graduate\u201d within the three (3)-month period following such Draft, and she\neither has no remaining intercollegiate eligibility or renounces her remaining intercollegiate\n\n=== Art_I ===\nARTICLE I\nDEFINITIONS\nAs used in this Agreement, the following terms shall have the following\nmeanings:\n(a)\n\n\u201cAdditional Marketing and Promotional Compensation\u201d means the\n\ncompensation in U.S. dollars that is paid or payable to a player pursuant to a WNBA Marketing\nand Promotional Agreement.\n(b)\n\n\u201cAgreement\u201d means this Collective Bargaining Agreement effective as of\n\nMarch 19, 2026.\n(c)\n\n\u201cAuthorized WNBA Footwear Supplier\u201d (or \u201cAuthorized Footwear\n\nSupplier\u201d) means an entity granted the right by WNBA Enterprises to outfit one or more WNBA\nplayers with logo-identified basketball footwear to be worn during WNBA games.\n(d)\n\n\u201cBase Salary\u201d means the salary that is set forth in Exhibit 1 to a Player\n\nContract that is paid or payable in U.S. dollars to a WNBA player (including players whose\nPlayer Contracts have been terminated) for rendering services under such Contract.\n(e)\n\n\u201cBona Fide Exclusive Endorsement Agreement\u201d means a binding\n\nagreement that: (i) is between a player and a Bona Fide Licensee authorizing or granting the\nBona Fide Licensee the right to use the Player Attributes of such player exclusively on or in\nconnection with a product or service; (ii) provides for\n\n=== Art_XX ===\nARTICLE XX\nPHYSICAL CONDITION, MEDICAL EXAMINATIONS AND INJURIES\nSection 1.\n\nMedical Examination, Supply of Information, and Fitness of Player.\n(a)\n\nUpon the signing of a Standard Player Contract and during each training\n\ncamp, a player shall submit to a complete medical examination by a physician designated by the\nTeam (the \u201cPhysician\u201d). Upon the signing of a Standard Player Contract, and upon the request\nof the Team, a player shall provide a complete prior medical history (including medical records).\nIn addition, a player shall provide a complete prior medical history (including medical records)\nrelated to any injury sustained (or condition aggravated) while performing basketball-related\nservices in connection with an Off-Season Playing Obligation or for an entity (e.g., n\n\n=== Art_XV ===\nARTICLE XV\nCIRCUMVENTION\nSection 1.\n\nGeneral Prohibitions.\n(a)\n\nIt is the intention of the parties that the provisions agreed to herein,\n\nincluding, without limitation, those relating to the Salary Cap, the Exceptions to the Salary Cap,\nthe Rookie Scale, and free agency, be interpreted so as to preserve the essential benefits achieved\nby both parties to this Agreement. Neither the Players Association or the WNBA, nor any Team\n(or Team Affiliate) or player (or person or entity acting with authority on behalf of such player),\nshall enter into any agreement (including, without limitation, any Player Contract, or any\namendment or extension thereof), or undertake any action or transaction (including, without\nlimitation, the assignment or termination of a Player Contract), which i\n\n=== Art_VIII ===\nARTICLE VIII\nROOKIE SCALE\n(a)\n\nThe Base Salaries set forth in a Rookie Scale Contract shall be the Rookie\n\nScale Amounts applicable to such Rookie Scale Contract.\n(b)\n\nThe following Rookie Scale Amounts shall be applicable to Rookie Scale\n\nContracts that commence with the 2026 Season:\nPick\n\n1st Year\nBase Salary\n\n2nd Year\nBase Salary\n\n3rd Year\nBase Salary\n\n4th Year Option\nBase Salary\n\nFirst Round - Pick 1\n\n$500,000\n\n$520,000\n\n$572,000\n\n$646,360\n\nFirst Round - Pick 2\n\n$466,913\n\n$485,590\n\n$534,149\n\n$603,588\n\nFirst Round - Pick 3\n\n$436,016\n\n$453,457\n\n$498,803\n\n$563,647\n\nFirst Roun\n\n=== Art_XXXIII ===\nARTICLE XXXIII\nEXPANSION, CONTRACTION,\nROSTERS, NUMBER OF GAMES, SEASON FOOTPRINT\nSection 1.\n\nNumber of Teams.\n(a)\n\nThe WNBA and Players Association agree that the WNBA has the\n\nabsolute right and discretion to determine the number and location of Teams that will participate\nin the WNBA during any Season, including, without limitation, the right and discretion to\nincrease or decrease the number of Teams in the WNBA at any time. The WNBA and the\nPlayers Association further agree that the WNBA and each WNBA Team has the absolute right\nand discretion to cease operations at any \n\n=== Art_IX ===\nARTICLE IX\nMERIT BONUSES\nSection 1.\n\nPayment of Merit Bonuses.\nDuring each Season covered by this Agreement, the WNBA and/or the Teams\n\nshall pay the merit bonuses set forth in Section 2 below. To be eligible to earn a Team bonus, a\nplayer must be under a Standard Player Contract on the Regular Season roster of the applicable\nTeam on the last day of the Regular Season; provided, how\n\n=== Art_IV ===\nARTICLE IV\nMANAGEMENT RIGHTS CLAUSE\nThe WNBA and WNBA Teams maintain and reserve the right to manage and\ndirect their operations in any manner whatsoever, except as limited by the provi";
+
+const WEIGHTS = `
+QUESTION DISTRIBUTION — generate exactly this mix:
+- Article V (Standard Player Contract): 3 questions — salary structures, protection types, allowable amendments, Training Camp/PDCs, pregnancy disability
+- Article VI (Free Agency): 2 questions — Core Players, Restricted/Unrestricted FA, qualifying offers, offer sheets, reserved players
+- Article VII (Salary Cap): 2 questions — cap exceptions, team salary calculation, trade rules, extensions, guarantee payments
+- Article X (Benefits): 1 question — health insurance, pregnancy disability benefit, 401k, childcare, family planning, mental health reimbursement
+- Article XIV (Player Conduct & Discipline): 1 question — fines, suspensions, holdouts, WNBA prioritization, gambling, firearms
+- Rotating (pick ONE of: Art I, VIII, IX, XIII, XV, XX, XXXIII): 1 question — vary this daily
+
+FORMAT: 8 multiple choice + 2 true/false. Mix them throughout — don't put T/F all at end.
+DIFFICULTY: Advanced — specific dollar figures, thresholds, timeframes, edge cases that matter in daily front-office operations. Assume deep familiarity with the old CBA.
+`;
+
+let answered = new Set();
+let correctCount = 0;
+let questions = [];
+const TOTAL = 10;
+
+function getKey() { return localStorage.getItem("anthropic_key"); }
+
+function show(id) {
+  ["apikey-screen","loading-screen","error-screen","quiz-screen"].forEach(s => {
+    document.getElementById(s).style.display = "none";
+  });
+  document.getElementById(id).style.display = "";
+}
+
+function saveKey() {
+  const k = document.getElementById("apikey-input").value.trim();
+  if (!k.startsWith("sk-ant-")) { alert("That doesn\'t look like an Anthropic API key (should start with sk-ant-)"); return; }
+  localStorage.setItem("anthropic_key", k);
+  generateQuiz();
+}
+
+async function generateQuiz() {
+  show("loading-screen");
+  document.getElementById("scorebar").style.display = "none";
+  answered.clear(); correctCount = 0; questions = [];
+  updateScore();
+
+  const key = getKey();
+  if (!key) { show("apikey-screen"); return; }
+
+  const prompt = `Using ONLY the following 2026 WNBA CBA reference text, generate a daily quiz.
+
+${WEIGHTS}
+
+CBA REFERENCE TEXT:
+${CBA_REF}
+
+Return ONLY a JSON array of exactly 10 objects. Each object must have:
+- "question": string
+- "type": "multiple_choice" or "true_false"  
+- "options": array of 4 strings (multiple_choice only; omit for true_false)
+- "correct_answer": "A", "B", "C", or "D" for MC; "A" for True, "B" for False for T/F
+- "explanation": 1-3 sentences citing the specific CBA article and section
+- "article": string like "Art. V §3(b)" or "Art. VI §7"
+
+Every question must be different. Focus on specific numbers, thresholds, and edge cases. No easy trivia.`;
+
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 3000,
+        system: "You are a precise WNBA CBA quiz generator. Output ONLY valid JSON array. No markdown fences, no preamble.",
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (resp.status === 401) {
+      localStorage.removeItem("anthropic_key");
+      document.getElementById("error-msg").textContent = "Invalid API key. Please re-enter it.";
+      show("error-screen"); return;
+    }
+    if (!resp.ok) throw new Error("API error " + resp.status);
+
+    const data = await resp.json();
+    let raw = data.content[0].text.trim();
+    raw = raw.replace(/^```json|^```|```$/gm, "").trim();
+    questions = JSON.parse(raw);
+
+    renderQuiz();
+  } catch(e) {
+    document.getElementById("error-msg").textContent = e.message || "Failed to generate quiz.";
+    show("error-screen");
+  }
+}
+
+function renderQuiz() {
+  const today = new Date().toLocaleDateString("en-US", {weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  document.getElementById("date-display").textContent = today;
+  document.getElementById("scorebar").style.display = "";
+  updateScore();
+
+  const screen = document.getElementById("quiz-screen");
+  screen.innerHTML = questions.map((q, i) => {
+    const isTF = q.type === "true_false";
+    const opts = isTF
+      ? [{l:"A",t:"True"},{l:"B",t:"False"}]
+      : (q.options||[]).map((o,j) => ({l:String.fromCharCode(65+j),t:o}));
+
+    return `<div class="q-card" id="qc${i}">
+      <div class="q-meta">
+        <span class="q-num">Q${i+1}</span>
+        <span class="q-article">${q.article||""}</span>
+        <span class="q-type">${isTF?"T / F":"4-choice"}</span>
+      </div>
+      <div class="q-text">${q.question}</div>
+      <div class="options">
+        ${opts.map(o => `<div class="opt" data-val="${o.l}" onclick="pick(this,${i})">
+          <span class="opt-letter">${o.l}</span>
+          <span class="opt-text">${o.t}</span>
+        </div>`).join("")}
+      </div>
+      <div class="explanation" id="exp${i}">
+        <div class="exp-label">CBA Reference</div>
+        ${q.explanation}
+      </div>
+    </div>`;
+  }).join("");
+
+  document.getElementById("finish-wrap").classList.remove("show");
+  document.getElementById("result-card").classList.remove("show");
+  show("quiz-screen");
+}
+
+function pick(el, idx) {
+  if (answered.has(idx)) return;
+  answered.add(idx);
+
+  const card = document.getElementById("qc" + idx);
+  const chosen = el.getAttribute("data-val");
+  const right = questions[idx].correct_answer;
+
+  card.querySelectorAll(".opt").forEach(o => {
+    o.onclick = null;
+    o.style.cursor = "default";
+    const v = o.getAttribute("data-val");
+    if (v === right && chosen !== right) o.classList.add("show-correct");
+  });
+
+  if (chosen === right) { el.classList.add("correct"); correctCount++; }
+  else el.classList.add("incorrect");
+
+  document.getElementById("exp" + idx).classList.add("show");
+  updateScore();
+
+  if (answered.size === TOTAL) {
+    document.getElementById("finish-wrap").classList.add("show");
+    setTimeout(() => document.getElementById("finish-wrap").scrollIntoView({behavior:"smooth"}), 300);
+  }
+}
+
+function updateScore() {
+  document.getElementById("s-correct").textContent = correctCount;
+  document.getElementById("s-answered").textContent = answered.size;
+  document.getElementById("s-left").textContent = TOTAL - answered.size;
+}
+
+function finishQuiz() {
+  const pct = Math.round(correctCount / TOTAL * 100);
+  const msgs = [[100,"Perfect. You know this CBA cold."],[90,"Excellent — nearly flawless."],[80,"Strong. A few edges to sharpen."],[70,"Solid. Review what you missed."],[60,"Getting there — keep grinding."],[0,"Use the explanations to level up."]];
+  const msg = msgs.find(m => pct >= m[0])[1];
+  document.getElementById("result-big").innerHTML = `${correctCount}<span>/${TOTAL}</span>`;
+  document.getElementById("result-msg").textContent = msg;
+  document.getElementById("result-card").classList.add("show");
+  document.getElementById("finish-wrap").classList.remove("show");
+  window.scrollTo({top: document.body.scrollHeight, behavior:"smooth"});
+}
+
+function startFresh() {
+  document.getElementById("result-card").classList.remove("show");
+  generateQuiz();
+}
+
+function retryOrReset() {
+  const key = getKey();
+  if (!key) { show("apikey-screen"); return; }
+  generateQuiz();
+}
+
+// Init
+const today = new Date().toLocaleDateString("en-US", {weekday:"long",month:"long",day:"numeric",year:"numeric"});
+document.getElementById("date-display").textContent = today;
+
+if (getKey()) { generateQuiz(); }
+else { show("apikey-screen"); }
+</script>
+</body>
+</html>
