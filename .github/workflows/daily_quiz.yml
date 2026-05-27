@@ -1,0 +1,30 @@
+name: WNBA CBA Daily Quiz
+
+on:
+  schedule:
+    - cron: '30 13 * * *'  # 6:30am PT (UTC-7) = 13:30 UTC
+  workflow_dispatch:        # allows manual trigger from GitHub UI
+
+jobs:
+  run-quiz:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run quiz script
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
+        run: python wnba_quiz.py

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>WNBA CBA Daily Quiz</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f4f5; min-height: 100vh; padding: 24px 16px; color: #1a1a1a; }
+.container { max-width: 640px; margin: 0 auto; }
+.header { background: #E25C1A; border-radius: 12px 12px 0 0; padding: 24px 24px; color: white; }
+.header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.header p { font-size: 13px; opacity: 0.85; }
+.progress-bar-wrap { background: rgba(255,255,255,0.3); border-radius: 99px; height: 5px; margin-top: 14px; }
+.progress-bar { background: white; height: 5px; border-radius: 99px; transition: width 0.4s ease; width: 0%; }
+.score-banner { background: white; border: 1px solid #e8e8e8; border-top: none; padding: 10px 24px; font-size: 13px; color: #666; display: flex; align-items: center; justify-content: space-between; }
+.score-num { font-weight: 700; color: #E25C1A; font-size: 15px; }
+.questions { background: white; border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 12px 12px; }
+.q-item { padding: 20px 24px; border-bottom: 1px solid #f0f0f0; }
+.q-item:last-child { border-bottom: none; }
+.q-meta { font-size: 11px; font-weight: 600; color: #E25C1A; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+.q-text { font-size: 15px; font-weight: 500; line-height: 1.55; margin-bottom: 14px; }
+.options { display: flex; flex-direction: column; gap: 8px; }
+.opt-btn { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1.5px solid #e4e4e7; border-radius: 8px; background: white; cursor: pointer; font-size: 14px; color: #333; text-align: left; width: 100%; -webkit-appearance: none; }
+.opt-btn:disabled { cursor: default; }
+.opt-letter { font-weight: 700; color: #999; min-width: 18px; font-size: 13px; flex-shrink: 0; }
+.opt-btn.correct { border-color: #2d9e6b !important; background: #f0faf5 !important; color: #1a6644 !important; }
+.opt-btn.correct .opt-letter { color: #2d9e6b; }
+.opt-btn.wrong { border-color: #e05252 !important; background: #fff5f5 !important; color: #9b2c2c !important; }
+.opt-btn.wrong .opt-letter { color: #e05252; }
+.opt-btn.reveal-correct { border-color: #2d9e6b !important; background: #f0faf5 !important; color: #1a6644 !important; opacity: 0.65; }
+.tf-btns { display: flex; gap: 10px; }
+.tf-btn { flex: 1; padding: 12px; border: 1.5px solid #e4e4e7; border-radius: 8px; background: white; cursor: pointer; font-size: 15px; font-weight: 600; color: #333; -webkit-appearance: none; }
+.tf-btn:disabled { cursor: default; }
+.tf-btn.correct { border-color: #2d9e6b !important; background: #f0faf5 !important; color: #1a6644 !important; }
+.tf-btn.wrong { border-color: #e05252 !important; background: #fff5f5 !important; color: #9b2c2c !important; }
+.tf-btn.reveal-correct { border-color: #2d9e6b !important; background: #f0faf5 !important; color: #1a6644 !important; opacity: 0.65; }
+.explanation { margin-top: 10px; padding: 10px 14px; border-left: 3px solid #ccc; border-radius: 0 6px 6px 0; font-size: 13px; line-height: 1.5; display: none; }
+.explanation.correct-exp { border-left-color: #2d9e6b; background: #f0faf5; color: #1a6644; }
+.explanation.wrong-exp { border-left-color: #e05252; background: #fff5f5; color: #7a2020; }
+.result-screen { display: none; background: white; border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 12px 12px; padding: 40px 24px; text-align: center; }
+.result-emoji { font-size: 52px; margin-bottom: 14px; }
+.result-score { font-size: 40px; font-weight: 800; color: #E25C1A; margin-bottom: 8px; }
+.result-label { font-size: 15px; color: #666; margin-bottom: 28px; line-height: 1.4; }
+.retake-btn { padding: 14px 32px; background: #E25C1A; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+.footer { text-align: center; margin-top: 16px; font-size: 12px; color: #aaa; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>&#127936; WNBA CBA Daily Quiz</h1>
+    <p id="dateStr">2026&#8211;2033 CBA &middot; Front office edition</p>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+  </div>
+  <div class="score-banner">
+    <span>Score</span>
+    <span class="score-num" id="scoreBanner">0 / 10</span>
+  </div>
+  <div class="questions" id="questionsDiv"></div>
+  <div class="result-screen" id="resultScreen">
+    <div class="result-emoji" id="resultEmoji"></div>
+    <div class="result-score" id="resultScore"></div>
+    <div class="result-label" id="resultLabel"></div>
+    <button class="retake-btn" onclick="location.reload()">Retake Quiz</button>
+  </div>
+  <div class="footer">Generated from the 2026 WNBA Collective Bargaining Agreement</div>
+</div>
+
+<script id="quizData" type="application/json">
+__QUIZ_DATA__
+</script>
+
+<script>
+(function() {
+  var data = JSON.parse(document.getElementById('quizData').textContent);
+  var questions = data.questions;
+  var dateStr = data.date;
+  var answered = 0;
+  var correct = 0;
+
+  document.getElementById('dateStr').textContent = dateStr + ' \u00b7 2026\u20132033 CBA \u00b7 Front office edition';
+  document.title = 'WNBA CBA Quiz \u2014 ' + dateStr;
+
+  function updateProgress() {
+    document.getElementById('progressBar').style.width = (answered / questions.length * 100) + '%';
+    document.getElementById('scoreBanner').textContent = correct + ' / ' + questions.length;
+    if (answered === questions.length) {
+      setTimeout(showResult, 700);
+    }
+  }
+
+  function showResult() {
+    document.getElementById('questionsDiv').style.display = 'none';
+    document.getElementById('resultScreen').style.display = 'block';
+    var pct = correct / questions.length;
+    var emoji, label;
+    if      (pct === 1)   { emoji = '\uD83C\uDFC6'; label = 'Perfect score \u2014 CBA expert!'; }
+    else if (pct >= 0.8)  { emoji = '\u2B50';       label = 'Excellent \u2014 you know this CBA cold.'; }
+    else if (pct >= 0.6)  { emoji = '\uD83D\uDCAA'; label = 'Solid \u2014 a few gaps to review.'; }
+    else if (pct >= 0.4)  { emoji = '\uD83D\uDCD6'; label = "Keep studying \u2014 you'll get there."; }
+    else                   { emoji = '\uD83D\uDD04'; label = 'Time to re-read those articles!'; }
+    document.getElementById('resultEmoji').textContent = emoji;
+    document.getElementById('resultScore').textContent = correct + ' / ' + questions.length;
+    document.getElementById('resultLabel').textContent = label;
+  }
+
+  function handleAnswer(qIndex, chosen) {
+    var q = questions[qIndex];
+    var isCorrect = (chosen === q.answer);
+    if (isCorrect) correct++;
+    answered++;
+
+    var btns = document.querySelectorAll('[data-q="' + qIndex + '"]');
+    for (var i = 0; i < btns.length; i++) {
+      var btn = btns[i];
+      btn.disabled = true;
+      var val = btn.getAttribute('data-val');
+      if (val === q.answer) {
+        btn.classList.add(isCorrect ? 'correct' : 'reveal-correct');
+      } else if (val === chosen && !isCorrect) {
+        btn.classList.add('wrong');
+      }
+    }
+
+    var exp = document.getElementById('exp-' + qIndex);
+    exp.style.display = 'block';
+    exp.classList.add(isCorrect ? 'correct-exp' : 'wrong-exp');
+    updateProgress();
+  }
+
+  // Use event delegation — no inline onclick needed
+  document.getElementById('questionsDiv').addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-q]');
+    if (!btn || btn.disabled) return;
+    var qIndex = parseInt(btn.getAttribute('data-q'));
+    var val = btn.getAttribute('data-val');
+    handleAnswer(qIndex, val);
+  });
+
+  // Render questions
+  var container = document.getElementById('questionsDiv');
+  var html = '';
+  for (var i = 0; i < questions.length; i++) {
+    var q = questions[i];
+    var typeLabel = q.type === 'mc' ? 'Multiple Choice' : 'True / False';
+    var inputsHtml = '';
+
+    if (q.type === 'mc') {
+      inputsHtml = '<div class="options">';
+      var letters = ['A', 'B', 'C', 'D'];
+      for (var j = 0; j < letters.length; j++) {
+        var l = letters[j];
+        if (q.options && q.options[l]) {
+          inputsHtml += '<button class="opt-btn" data-q="' + i + '" data-val="' + l + '">' +
+            '<span class="opt-letter">' + l + '</span>' +
+            '<span>' + q.options[l] + '</span>' +
+            '</button>';
+        }
+      }
+      inputsHtml += '</div>';
+    } else {
+      inputsHtml = '<div class="tf-btns">' +
+        '<button class="tf-btn" data-q="' + i + '" data-val="True">True</button>' +
+        '<button class="tf-btn" data-q="' + i + '" data-val="False">False</button>' +
+        '</div>';
+    }
+
+    html += '<div class="q-item">' +
+      '<div class="q-meta">Q' + q.num + ' &middot; ' + (q.article || '') + ' &middot; ' + typeLabel + '</div>' +
+      '<div class="q-text">' + q.question + '</div>' +
+      inputsHtml +
+      '<div class="explanation" id="exp-' + i + '">' +
+        '<strong>Answer: ' + q.answer + '</strong> &mdash; ' + (q.explanation || '') +
+      '</div>' +
+      '</div>';
+  }
+  container.innerHTML = html;
+})();
+</script>
+</body>
+</html>
