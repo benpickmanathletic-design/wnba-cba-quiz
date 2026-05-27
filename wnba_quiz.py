@@ -249,8 +249,15 @@ def upload_to_netlify(html_content: str, date_str: str) -> str:
 
 
 def get_netlify_site_id() -> str:
-    """Read saved Netlify site ID if it exists."""
-    for path in ['/tmp/wnba_quiz_site_id.txt', os.path.expanduser('~/Downloads/wnba_quiz_site_id.txt')]:
+    """Read Netlify site ID from environment variable or saved file."""
+    # First check environment variable (set as GitHub Actions secret)
+    env_id = os.environ.get('NETLIFY_SITE_ID', '').strip()
+    if env_id:
+        return env_id
+    # Fall back to saved file
+    for path in ['/tmp/wnba_quiz_site_id.txt',
+                 os.path.expanduser('~/Downloads/wnba_quiz_site_id.txt'),
+                 os.path.join(os.path.dirname(os.path.abspath(__file__)), 'netlify_site_id.txt')]:
         if os.path.exists(path):
             with open(path) as f:
                 val = f.read().strip()
