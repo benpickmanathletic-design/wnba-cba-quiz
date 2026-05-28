@@ -2,8 +2,8 @@ name: Daily WNBA CBA Quiz
 
 on:
   schedule:
-    - cron: '30 13 * * *'  # 6:30 AM PT (PDT = UTC-7)
-  workflow_dispatch:  # allows manual trigger
+    - cron: '30 13 * * *'
+  workflow_dispatch:
 
 jobs:
   send-quiz:
@@ -17,24 +17,50 @@ jobs:
         run: |
           pip install anthropic --quiet
           python3 << 'PYEOF'
-          import anthropic, smtplib, os, json
+          import anthropic, smtplib, os, json, base64
           from datetime import datetime
           from email.mime.multipart import MIMEMultipart
           from email.mime.text import MIMEText
+          from email.mime.base import MIMEBase
+          from email import encoders
+
+          CBA_B64 = "PT09IEFydF9WID09PQpBUlRJQ0xFIFYKU1RBTkRBUkQgUExBWUVSIENPTlRSQUNUClNlY3Rpb24gMS4KClJlcXVpcmVkIEZvcm0uClRoZSBjb250cmFjdCB0byBiZSBlbnRlcmVkIGludG8gYnkgZWFjaCBwbGF5ZXIgYW5kIHRoZSBUZWFtIGJ5IHdoaWNoIHNoZSBpcwoKZW1wbG95ZWQgc2hhbGwgYmUgYSBTdGFuZGFyZCBQbGF5ZXIgQ29udHJhY3QgaW4gdGhlIGZvcm0gYW5uZXhlZCBoZXJldG8gYXMgRXhoaWJpdCAxLgpTZWN0aW9uIDIuCgpMaW1pdGF0aW9uIG9uIEFtZW5kbWVudHMuCihhKQoKRXhjZXB0IGFzIHByb3ZpZGVkIGluIFNlY3Rpb25zIDMsIDksIDEwLCAxMSwgYW5kIDEyIG9mIHRoaXMgQXJ0aWNsZSBhbmQgaW4KCkFydGljbGUgVklJLCBTZWN0aW9uIDUsIG5vIGFtZW5kbWVudHMgb2YgYW55IGtpbmQgdG8gdGhlIGZvcm0gb3IgdGhlIHRlcm1zIG9mIHRoZSBTdGFuZGFyZApQbGF5ZXIgQ29udHJhY3QgcHJvdmlkZWQgZm9yIGJ5IFNlY3Rpb24gMSBvZiB0aGlzIEFydGljbGUgc2hhbGwgYmUgcGVybWl0dGVkLgooYikKCklmIGEgVGVhbSBhbmQgYSBwbGF5ZXIgZW50ZXIgaW50byAoaSkgYSBTdGFuZGFyZCBQbGF5ZXIgQ29udHJhY3QgY29udGFpbmluZwoKYW4gYW1lbmRtZW50IG5vdCBzcGVjaWZpY2FsbHkgcGVybWl0dGVkIGJ5IHRoaXMgQWdyZWVtZW50IG9yIChpaSkgYSBzdWJzZXF1ZW50IGFtZW5kbWVudCB0bwphbiBleGlzdGluZyBQbGF5ZXIgQ29udHJhY3Qgd2hlbiBzdWNoIGFtZW5kbWVudCBpcyBub3Qgc3BlY2lmaWNhbGx5IHBlcm1pdHRlZCBieSB0aGlzCkFncmVlbWVudCwgdGhlbiBzdWNoIENvbnRyYWN0IG9yIHN1YnNlcXVlbnQgYW1lbmRtZW50LCBhcyB0aGUgY2FzZSBtYXkgYmUsIHNoYWxsIGJlCmRpc2FwcHJvdmVkIGJ5IHRoZSBDb21taXNzaW9uZXIgYW5kIHJlbmRlcmVkIG51bGwgYW5kIHZvaWQuCihjKQoKT25jZSBleGVjdXRlZCBieSB0aGUgcGxheWVyIGFuZCB0aGUgVGVhbSwgYSBQbGF5ZXIgQ29udHJhY3QgbWF5IG5vdCBiZQoKYW1lbmRlZCBvciBjaGFuZ2VkIGluIGFueSBtYW5uZXIgZXhjZXB0IHB1cnN1YW50IHRvIFNlY3Rpb24gMyhlKSwgKGcpKGlpaSkgYmVsb3cgb3IgQXJ0aWNsZSBWSUksClNlY3Rpb24gNS4KKGQpCgpOb3R3aXRoc3RhbmRpbmcgYW55dGhpbmcgdG8gdGhlIGNvbnRyYXJ5IGluIHRoaXMgU2VjdGlvbiAyLCBhIHBsYXllciBtYXkKCnVuaWxhdGVyYWxseSBjaGFuZ2UgdGhlIGZvcm0gb2YgdGhlIFN0YW5kYXJkIFBsYXllciBDb250cmFjdCBieSBkZWxldGluZyBwYXJhZ3JhcGggNihkKSB0aGVyZW9mCmluIGl0cyBlbnRpcmV0eS4KU2VjdGlvbiAzLgoKQWxsb3dhYmxlIEFtZW5kbWVudHMuCkluIHRoZWlyIGluZGl2aWR1YWwgY29udHJhY3QgbmVnb3RpYXRpb25zLCBhIFZldGVyYW4gUGxheWVyIChidXQgbm90IGEgUm9va2llKSBhbmQgYQoKVGVhbSBtYXkgYW1lbmQgdGhlIHByb3Zpc2lvbnMgb2YgYSBTdGFuZGFyZCBQbGF5ZXIgQ29udHJhY3QsIGJ1dCBvbmx5IGluIHRoZSBmb2xsb3dpbmcKcmVzcGVjdHM6CjIwCgoKKGEpCgpCeSBhZ3JlZWluZyB1cG9uIHByb3Zpc2lvbnMgKHRvIGJlIHNldCBmb3J0aCBpbiBFeGhpYml0IDEgdG8gYSBTdGFuZGFyZAoKUGxheWVyIENvbnRyYWN0KSBzZXR0aW5nIGZvcnRoIHRoZSBCYXNlIFNhbGFyeSB0byBiZSBwYWlkIHRvIHRoZSBwbGF5ZXIgZm9yIGVhY2ggU2Vhc29uIG9mIHRoZQpDb250cmFjdCBmb3IgcmVuZGVyaW5nIHRoZSBzZXJ2aWNlcyBkZXNjcmliZWQgaW4gc3VjaCBDb250cmFjdC4KKGIpCgpCeSBhZ3JlZWluZyB1cG9uIHByb3Zpc2lvbnMgKHRvIGJlIHNldCBmb3J0aCBpbiBFeGhpYml0IDIgdG8gYSBTdGFuZGFyZAoKUGxheWVyIENvbnRyYWN0KSBzdGF0aW5nIHRoYXQgdGhlIEJhc2UgU2FsYXJ5IHByb3ZpZGVkIGZvciBieSB0aGUgU3RhbmRhcmQgUGxheWVyIENvbnRyYWN0IHNoYWxsCmJlLCBpbiB3aG9sZSBvciBpbiBwYXJ0LCBhbmQgc3ViamVjdCB0byBhbnkgY29uZGl0aW9ucyBvciBsaW1pdGF0aW9ucywgcHJvdGVjdGVkIGluIHRoZSBldmVudCB0aGF0IHRoZQpDb250cmFjdCBpcyB0ZXJtaW5hdGVkIGJ5IHRoZSBUZWFtIGJ5IHJlYXNvbiBvZiB0aGUgcGxheWVy4oCZczogKGkpIGxhY2sgb2Ygc2tpbGw7IChpaSkgZGlzYWJpbGl0eSBvcgp1bmZpdG5lc3MgdG8gcGxheSBza2lsbGVkIGJhc2tldGJhbGwgcmVzdWx0aW5nIGZyb20gYSBiYXNrZXRiYWxsLXJlbGF0ZWQgaW5qdXJ5ICjigJxiYXNrZXRiYWxsLXJlbGF0ZWQKaW5qdXJ54oCdKTsgKGlpaSkgZGlzYWJpbGl0eSBvciB1bmZpdG5lc3MgdG8gcGxheSBza2lsbGVkIGJhc2tldGJhbGwgcmVzdWx0aW5nIGZyb20gYW55IGluanVyeSBvciBpbGxuZXNzCnN1ZmZlcmVkIGJ5IHRoZSBwbGF5ZXIgZHVyaW5nIGEgV05CQSBTZWFzb24gKOKAnGluLVNlYXNvbiBpbmp1cnkgb3IgaWxsbmVzc+KAnSk7IChpdikgZGlzYWJpbGl0eSBvcgp1bmZpdG5lc3MgdG8gcGxheSBza2lsbGVkIGJhc2tldGJhbGwgcmVzdWx0aW5nIGZyb20gYW4KCj09PSBBcnRfVkkgPT09CkFSVElDTEUgVkkKRlJFRSBBR0VOQ1kKU2VjdGlvbiAxLgoKR2VuZXJhbCBSdWxlcy4KKGEpCgpTdWJqZWN0IHRvIHRoZSBwcm92aXNpb25zIG9mIEFydGljbGUgVklJLCAoaSkgYSBSZXNlcnZlZCBQbGF5ZXIgaXMgZnJlZSBhdCBhbnkKCnRpbWUgYmVnaW5uaW5nIG9uIEZlYnJ1YXJ5IDQgdG8gbmVnb3RpYXRlIGEgUGxheWVyIENvbnRyYWN0IHdpdGggaGVyIFByaW9yIFRlYW0gYW5kIHRvIGFjY2VwdCBhClJlc2VydmVkIFF1YWxpZnlpbmcgT2ZmZXIgZnJvbSBoZXIgUHJpb3IgVGVhbSwgYW5kIGlzIGZyZWUgYXQgYW55IHRpbWUgYmVnaW5uaW5nIG9uIHRoZSBkYXkKZm9sbG93aW5nIHRoZSBsYXN0IGRheSBvZiB0aGUgTW9yYXRvcml1bSBQZXJpb2QgdG8gZW50ZXIgaW50byBhIFBsYXllciBDb250cmFjdCB3aXRoIGhlciBQcmlvcgpUZWFtOyAoaWkpIGFuIFVucmVzdHJpY3RlZCBGcmVlIEFnZW50IGlzIGZyZWUgYXQgYW55IHRpbWUgYmVnaW5uaW5nIG9uIEZlYnJ1YXJ5IDQgdG8gbmVnb3RpYXRlLAphbmQgZnJlZSBhdCBhbnkgdGltZSBiZWdpbm5pbmcgb24gdGhlIGRheSBmb2xsb3dpbmcgdGhlIGxhc3QgZGF5IG9mIHRoZSBNb3JhdG9yaXVtIFBlcmlvZCB0bwplbnRlciBpbnRvLCBhIFBsYXllciBDb250cmFjdCB3aXRoIGFueSBUZWFtOyAoaWlpKSBhIFJlc3RyaWN0ZWQgRnJlZSBBZ2VudCBpcyBmcmVlIGF0IGFueSB0aW1lCmJlZ2lubmluZyBvbiBGZWJydWFyeSA0IHRvIG5lZ290aWF0ZSBhIFBsYXllciBDb250cmFjdCB3aXRoIGhlciBQcmlvciBUZWFtLCB0byBhY2NlcHQgYQpSZXN0cmljdGVkIFF1YWxpZnlpbmcgT2ZmZXIgZnJvbSBoZXIgUHJpb3IgVGVhbSwgYW5kIHRvIG5lZ290aWF0ZSBhbiBPZmZlciBTaGVldCB3aXRoIGFueSBUZWFtCm90aGVyIHRoYW4gaGVyIFByaW9yIFRlYW0sIGFuZCBpcyBmcmVlIGF0IGFueSB0aW1lIGJlZ2lubmluZyBvbiB0aGUgZGF5IGZvbGxvd2luZyB0aGUgbGFzdCBkYXkgb2YKdGhlIE1vcmF0b3JpdW0gUGVyaW9kIHRvIGVudGVyIGludG8gYSBQbGF5ZXIgQ29udHJhY3Qgd2l0aCBoZXIgUHJpb3IgVGVhbSBvciBhbiBPZmZlciBTaGVldCB3aXRoCmFueSBUZWFtIG90aGVyIHRoYW4gaGVyIFByaW9yIFRlYW07IGFuZCAoaXYpIGEgQ29yZSBQbGF5ZXIgaXMgZnJlZSBhdCBhbnkgdGltZSBiZWdpbm5pbmcgb24KRmVicnVhcnkgNCB0byBuZWdvdGlhdGUgYSBQbGF5ZXIgQ29udHJhY3Qgd2l0aCBoZXIgUHJpb3IgVGVhbSBvciB0byBhY2NlcHQgYSBDb3JlIFF1YWxpZnlpbmcKT2ZmZXIgZnJvbSBoZXIgUHJpb3IgVGVhbSwgYW5kIGlzIGZyZWUgYXQgYW55IHRpbWUgYmVnaW5uaW5nIG9uIHRoZSBkYXkgZm9sbG93aW5nIHRoZSBsYXN0IGRheSBvZgp0aGUgTW9yYXRvcml1bSBQZXJpb2QgdG8gZW50ZXIgaW50byBhIFBsYXllciBDb250cmFjdCB3aXRoIGhlciBQcmlvciBUZWFtLgooYikKCk5vIGNvbXBlbnNhdGlvbiBvYmxpZ2F0aW9uIG9mIGFueSBraW5kIHRvIGFub3RoZXIgVGVhbSBzaGFsbCBiZQoKYXBwbGljYWJsZSB0byBhbnkgRnJlZSBBZ2VudC4gTm8gcmlnaHQgb2YgZmlyc3QgcmVmdXNhbCAo4oCcUmlnaHQgb2YgRmlyc3QgUmVmdXNhbOKAnSkgc2hhbGwgYmUKYXBwbGljYWJsZSB0byBhbnkgRnJlZSBBZ2VudCBvdGhlciB0aGFuIGEgUmVzdHJpY3RlZCBGcmVlIEFnZW50LgoKNjEKCgpTZWN0aW9uIDIuCgpObyBJbmRpdmlkdWFsbHktTmVnb3RpYXRlZCBSaWdodCBvZiBGaXJzdCBSZWZ1c2FsLgooYSkKCk5vIFBsYXllciBDb250cmFjdCwgb3IgYW55IEV4dGVuc2lvbiBvciBvdGhlciBhbWVuZG1lbnQgb2YgYSBQbGF5ZXIKCkNvbnRyYWN0IG1heSBpbmNsdWRlIGFueSBpbmRpdmlkdWFsbHkgbmVnb3RpYXRlZCBSaWdodCBvZiBGaXJzdCBSZWZ1c2FsIG9yIG90aGVyIGxpbWl0YXRpb24gb24KcGxheWVyIG1vdmVtZW50IGZvbGxvd2luZyB0aGUgbGFzdCBTYWxhcnkgQ2FwIFllYXIgY292ZXJlZCBieSBzdWNoIFBsYXllciBDb250cmFjdC4KKGIpCgpObyBSaWdodCBvZiBGaXJzdCBSZWZ1c2FsIHJ1bGUsIHByYWN0aWNlLCBwb2xpY3ksIHJlZ3VsYXRpb24gb3IgYWdyZWVtZW50Cgpwcm92aWRpbmcgZm9yIGEgUmlnaHQgb2YgRmlyc3QgUmVmdXNhbCBzaGFsbCBiZSBhcHBsaWVkIHRvIGFueSBwbGF5ZXIgYXMgYSByZXN1bHQgb2YgdGhhdCBwbGF5ZXLigJlzCmVudHJ5IGludG8gYSBwbGF5ZXIgY29udHJhY3Qgd2l0aCBvciB0aGUgcGxheWluZyB3aXRoIGFueSB0ZWFtIGluIGFueSBwcm9mZXNzaW9uYWwgYmFza2V0YmFsbApsZWFndWUgb3RoZXIgdGhhbiB0aGUgV05CQS4KU2VjdGlvbiAzLgoKV2l0aGhvbGRpbmcgU2VydmljZXMuCkEgcGxheWVyIHdobyB3aXRoaG9sZHMgcGxheWluZyBzZXJ2aWNlcyBjYWxsZWQgZm9yIGJ5IGEgUGxheWVyIENvbnRyYWN0IGZvciBtb3JlCgp0aGFuIHR3ZW50eS1vbmUgKDIxKSBkYXlzIGR1cmluZyB0aGUgbGFzdCBTZWFzb24gY292ZXJlZCBieSBoZXIgUGxheWVyIENvbnRyYWN0IG8KCj09PSBBcnRfVklJID09PQpBUlRJQ0xFIFZJSQpTQUxBUlkgQ0FQLCBHVUFSQU5URUUgUEFZTUVOVFMsIEFORCBNSU5JTVVNIFRFQU0gU0FMQVJZClNlY3Rpb24gMS4KCkFtb3VudCBvZiBTYWxhcnkgQ2FwLCBHdWFyYW50ZWUgUGF5bWVudHMgYW5kIE1pbmltdW0gVGVhbSBTYWxhcnkuCihhKQoKU2FsYXJ5IENhcC4KVGhlIFNhbGFyeSBDYXAgZm9yIHRoZSAyMDI2IFNhbGFyeSBDYXAgWWVhciBzaGFsbCBiZSAkNywwMDAsMDAwLgoKRm9yIGVhY2ggc3Vic2VxdWVudCBTYWxhcnkgQ2FwIFllYXIgZHVyaW5nIHRoZSB0ZXJtIG9mIHRoaXMgQWdyZWVtZW50LCB0aGUgU2FsYXJ5IENhcCBzaGFsbAplcXVhbCAoMSkgdGhlIERlc2lnbmF0ZWQgMjAlIFNoYXJlIG9mIFNCUiBmb3IgdGhlIGFwcGxpY2FibGUgU2FsYXJ5IENhcCBZZWFyLCBtaW51cyBTYWxhcnkKQ2FwIEJlbmVmaXRzIGZvciB0aGUgYXBwbGljYWJsZSBTYWxhcnkgQ2FwIFllYXIsIHBsdXMgdGhlIFVwd2FyZCBBZGp1c3RtZW50IEFtb3VudCBmb3IgdGhlCmltbWVkaWF0ZWx5IHByZWNlZGluZyBTYWxhcnkgQ2FwIFllYXIgKGlmIGFueSksIG1pbnVzIHRoZSBEb3dud2FyZCBBZGp1c3RtZW50IEFtb3VudCBmb3IKdGhlIGltbWVkaWF0ZWx5IHByZWNlZGluZyBTYWxhcnkgQ2FwIFllYXIgKGlmIGFueSksIGRpdmlkZWQgYnkgKDIpIHRoZSB0b3RhbCBudW1iZXIgb2YgVGVhbXMKcGFydGljaXBhdGluZyBpbiB0aGUgV05CQSBpbiB0aGUgU2Vhc29uIGNvdmVyZWQgYnkgdGhlIGFwcGxpY2FibGUgU2FsYXJ5IENhcCBZZWFyLgpOb3R3aXRoc3RhbmRpbmcgYW55dGhpbmcgdG8gdGhlIGNvbnRyYXJ5IGluIFNlY3Rpb24gMShhKShpKSBhYm92ZSwKKDEpIHRoZSBTYWxhcnkgQ2FwIGZvciB0aGUgMjAyNyBTYWxhcnkgQ2FwIFllYXIgc2hhbGwgbm90IGluY3JlYXNlIG9yIGRlY3JlYXNlIGJ5IG1vcmUgdGhhbgp0aGlydGVlbiBwZXJjZW50ICgxMyUpIGZyb20gdGhlIFNhbGFyeSBDYXAgZm9yIHRoZSAyMDI2IFNhbGFyeSBDYXAgWWVhciwgYW5kICgyKSB0aGUgU2FsYXJ5IENhcApmb3IgZWFjaCBTYWxhcnkgQ2FwIFllYXIgZm9sbG93aW5nIHRoZSAyMDI3IFNhbGFyeSBDYXAgWWVhciBzaGFsbCBub3QgaW5jcmVhc2Ugb3IgZGVjcmVhc2UgYnkKbW9yZSB0aGFuIHRlbiBwZXJjZW50ICgxMCUpIG9mIHRoZSBTYWxhcnkgQ2FwIGZvciB0aGUgU2FsYXJ5IENhcCBZZWFyIGltbWVkaWF0ZWx5IHByZWNlZGluZwpzdWNoIFNhbGFyeSBDYXAgWWVhci4KKGIpCgpHdWFyYW50ZWUgUGF5bWVudHMgdG8gUGxheWVycy4KSW4gdGhlIGV2ZW50IHRoYXQgdGhlIFNhbGFyeSBDYXAgZm9yIGEgU2FsYXJ5IENhcCBZZWFyIHdvdWxkIGhhdmUKCmluY3JlYXNlZCBieSBtb3JlIHRoYW4gdGVuIHBlcmNlbnQgKDEwJSkgb2YgdGhlIFNhbGFyeSBDYXAgZm9yIHRoZSBTYWxhcnkgQ2FwIFllYXIgaW1tZWRpYXRlbHkKcHJlY2VkaW5nIHN1Y2ggU2FsYXJ5IENhcCBZZWFyIChvciwgd2l0aCByZXNwZWN0IHRvIHRoZSBTYWxhcnkgQ2FwIGZvciB0aGUgMjAyNyBTYWxhcnkgQ2FwClllYXIsIGJ5IG1vcmUgdGhhbiB0aGlydGVlbiBwZXJjZW50ICgxMyUpIGZyb20gdGhlIFNhbGFyeSBDYXAgZm9yIHRoZSAyMDI2IFNhbGFyeSBDYXAgWWVhcikKYnV0IGZvciB0aGUgb3BlcmF0aW9uIG9mIFNlY3Rpb24gMShhKShpaSkgYWJvdmUsIHRoZW4gdGhlIOKAnFNhbGFyeSBDYXAgTGltaXQgU2hvcnRmYWxs4oCdIGZvciBzdWNoClNhbGFyeSBDYXAgWWVhciBzaGFsbCBiZSB0aGUgYWRkaXRpb25hbCBhbW91bnQgYnkgd2hpY2ggdGhlIFNhbGFyeSBDYXAgd291bGQgaGF2ZSBpbmNyZWFzZWQKODAKCgpidXQgZm9yIHRoZSBvcGVyYXRpb24gb2YgU2VjdGlvbiAxKGEpKGlpKSBhYm92ZSAoaS5lLiwgdGhlIGFtb3VudCBpbiBleGNlc3Mgb2YgYSB0ZW4gcGVyY2VudCAoMTAlKSwKb3IgdGhpcnRlZW4gcGVyY2VudCAoMTMlKSwgaW5jcmVhc2UsIGFzIGFwcGxpY2FibGUpIG11bHRpcGxpZWQgYnkgdGhlIHRvdGFsIG51bWJlciBvZiBUZWFtcwpwYXJ0aWNpcGF0aW5nIGluIHRoZSBXTkJBIGluIHRoZSBTZWFzb24gY292ZXJlZCBieSBzdWNoIFNhbGFyeSBDYXAgWWVhci4KSW4gdGhlIGV2ZW50IHRoYXQsIGFzIG9mIHRoZSBjb25jbHVzaW9uIG9mIGEgU2Vhc29uIGNvdmVyZWQgYnkgYQpTYWxhcnkgQ2FwIFllYXIsIChBKSBUb3RhbCBTYWxhcmllcyBmb3Igc3VjaCBTYWxhcnkgQ2FwIFllYXIgaXMgbGVzcyB0aGFuIChCKSB0aGUgU2FsYXJ5IENhcCBmb3IKc3VjaCBTYWxhcnkgQ2FwIFllYXIgbXVsdGlwbGllZCBieSB0aGUgdG90YWwgbnVtYmVyIG9mIFRlYW1zIHBhcnRpY2lwYXRpbmcgaW4gdGhlIFdOQkEgaW4Kc3VjaCBTZWFzb24sIHRoZW4gdGhlIOKAnEd1YXJhbnRlZSBTaG9ydGZhbGzigJ0gZm9yIHN1Y2ggU2FsYXJ5IENhcCBZZWFyIHNoYWxsIGVxdWFsIHRoZSBhbW91bnQgb2YKdGhlIHNob3J0ZmFsbC4KVGhlIFdOQkEgc2hhbGwgYmUgb2JsaWdhdGVkIHRvIHBheSB0aGUgc3VtIG9mIHRoZSBTYQoKPT09IEFydF9YID09PQpBUlRJQ0xFIFgKQkVORUZJVFMKU2VjdGlvbiAxLgoKSGVhbHRoIEluc3VyYW5jZS4KKGEpCgpNZWRpY2FsIENvdmVyYWdlLgoKRHVyaW5nIGVhY2ggU2Vhc29uIGNvdmVyZWQgYnkgdGhpcyBBZ3JlZW1lbnQsIGVhY2ggcGxheWVyIHdobyBpcyBhIHBhcnR5IHRvIGEKU3RhbmRhcmQgUGxheWVyIENvbnRyYWN0IG9yIGEgUGxheWVyIERldmVsb3BtZW50IENvbnRyYWN0IChhbmQgc3VjaCBwbGF5ZXLigJlzIGVsaWdpYmxlCmRlcGVuZGVudHMsIGlmIGFwcGxpY2FibGUpIHdpbGwgYmUgcHJvdmlkZWQgd2l0aCBtZWRpY2FsIGJlbmVmaXRzIGZvciB0aGUgcGVyaW9kIGJlZ2lubmluZyBvbiB0aGUKZmlyc3QgZGF5IG9mIHRyYWluaW5nIGNhbXAgYW5kIGVuZGluZyBvbiB0aGUgZGF5IHN1Y2ggQ29udHJhY3QgZXhwaXJlcyBvciBpcyB0ZXJtaW5hdGVkOyBwcm92aWRlZAp0aGF0LCAoeCkgYSBwbGF5ZXIgd2hvc2UgU3RhbmRhcmQgUGxheWVyIENvbnRyYWN0IGlzIHRlcm1pbmF0ZWQgcHJpb3IgdG8gdGhlIE1pZC1Qb2ludCBvZiB0aGUKUmVndWxhciBTZWFzb24gd2lsbCBjb250aW51ZSB0byByZWNlaXZlIG1lZGljYWwgYmVuZWZpdHMgZm9yIGEgcGVyaW9kIG9mIHRoaXJ0eSAoMzApIGRheXMKZm9sbG93aW5nIGNvbnRyYWN0IHRlcm1pbmF0aW9uLCBhdCB0aGUgY29uY2x1c2lvbiBvZiB3aGljaCB0aGUgcGxheWVyIHdpbGwgYmUgcHJvdmlkZWQgd2l0aCBhCm5vdGljZSBvZiBDT0JSQSByaWdodHMsIGFuZCAoeSkgYSBwbGF5ZXIgd2hvc2UgU3RhbmRhcmQgUGxheWVyIENvbnRyYWN0IGlzIHRlcm1pbmF0ZWQgYWZ0ZXIgdGhlCk1pZC1Qb2ludCBvZiB0aGUgUmVndWxhciBTZWFzb24gd2lsbCBjb250aW51ZSB0byByZWNlaXZlIG1lZGljYWwgYmVuZWZpdHMgdW50aWwgdGhlIGVuZCBvZiB0aGUKY2FsZW5kYXIgeWVhciwgYXQgdGhlIGNvbmNsdXNpb24gb2Ygd2hpY2ggdGhlIHBsYXllciB3b3VsZCBiZSBwcm92aWRlZCB3aXRoIGEgbm90aWNlIG9mIENPQlJBCnJpZ2h0cy4gVGhlIGVsaWdpYmlsaXR5IHJlcXVpcmVtZW50cywgY2lyY3Vtc3RhbmNlcyB1bmRlciB3aGljaCBiZW5lZml0cyBtYXkgYmUgdGVybWluYXRlZCwgYW5kCnRoZSBuYXR1cmUgb2YgdGhlIGJlbmVmaXRzIHdpbGwgYmUgc2V0IGZvcnRoIGluIHN1bW1hcmllcyB0aGF0IHdpbGwgYmUgZGlzdHJpYnV0ZWQgYnkgdGhlIFdOQkEgdG8KZWFjaCBwbGF5ZXIgc2lnbmVkIHRvIGEgQ29udHJhY3QgYW5kIHRvIHRoZSBQbGF5ZXJzIEFzc29jaWF0aW9uLgpGb3IgdGhlIDIwMjYgU2Vhc29uLCBzdWJqZWN0IHRvIGFueSBjb25kaXRpb25zIGFuZCBsaW1pdGF0aW9ucwpjb250YWluZWQgaW4gdGhlIHBsYW4sIHRoZSBtZWRpY2FsIHBsYW4gcHJvdmlkZXMgdGhhdCBwbGF5ZXJzIHdpbGwgcmVjZWl2ZSBib3RoIChBKSBpbi1uZXR3b3JrCnNlcnZpY2VzIHdpdGggYSBjb3BheW1lbnQgZm9yIGNlcnRhaW4gc2VydmljZXMsIGEgJDYwMCBhbm51YWwgZGVkdWN0aWJsZSAKCj09PSBBcnRfWElWID09PQpBUlRJQ0xFIFhJVgpQTEFZRVIgQ09ORFVDVCBBTkQgRElTQ0lQTElORQpTZWN0aW9uIDEuCgpQbGF5ZXIgT2JsaWdhdGlvbnMuClBsYXllcnMgc2hhbGwgYXQgYWxsIHRpbWVzIGNvbmZvcm0gdGhlaXIgY29uZHVjdCB0byBzdGFuZGFyZHMgb2YgZ29vZCBjaXRpemVuc2hpcCwKCmdvb2QgbW9yYWwgY2hhcmFjdGVyLCBhbmQgZ29vZCBzcG9ydHNtYW5zaGlwIGFuZCBzaGFsbCBub3QgZG8gYW55dGhpbmcgZGV0cmltZW50YWwgb3IKcHJlanVkaWNpYWwgdG8gdGhlIGJlc3QgaW50ZXJlc3RzIG9mIHRoZSBXTkJBLCB0aGVpciBUZWFtcywgb3IgdGhlIHNwb3J0IG9mIGJhc2tldGJhbGwuIFdpdGhvdXQKbGltaXRpbmcgdGhlIGZvcmVnb2luZywgcGxheWVycyBzaGFsbCBhbHNvIGJlIHJlcXVpcmVkIGF0IGFsbCB0aW1lcyB0byBjb21wbHkgd2l0aCBhbGwgdGVybXMgYW5kCnByb3Zpc2lvbnMgb2YgdGhpcyBBZ3JlZW1lbnQ7IHRvIHBlcmZvcm0gYWxsIHNlcnZpY2VzIHJlcXVpcmVkIHVuZGVyIHRoZWlyIFN0YW5kYXJkIFBsYXllcgpDb250cmFjdHMgb3IgYW55IFdOQkEgTWFya2V0aW5nIGFuZCBQcm9tb3Rpb25hbCBBZ3JlZW1lbnRzOyB0byBjb21wbHkgYXQgYWxsIHRpbWVzIHdpdGggYWxsCmFwcGxpY2FibGUgZmVkZXJhbCwgc3RhdGUsIGFuZCBsb2NhbCBsYXdzOyB0byBiZSBuZWF0bHkgYXR0aXJlZCBhbmQgcHJlc2VudCBhIHByb2Zlc3Npb25hbAphcHBlYXJhbmNlIHdoZW4gaW4gcHVibGljIChpbmNsdWRpbmcgYWxsIHBsYXllciBhcHBlYXJhbmNlcywgdHJhdmVsIGRheXMsIGFuZCB0cmF2ZWwgdG8gYW5kIGZyb20KdGhlIGFyZW5hKTsgYW5kIHRvIGZvbGxvdyBhbGwgcmVhc29uYWJsZSBydWxlcyBhbmQgcmVndWxhdGlvbnMgb2YgdGhlIFdOQkEgYW5kIHRoZWlyIFRlYW1zCnByb211bGdhdGVkIGluIGFjY29yZGFuY2Ugd2l0aCB0aGlzIEFncmVlbWVudC4gRm9yIGF2b2lkYW5jZSBvZiBkb3VidCwgYW55IHBsYXllciB3aG8KcHVibGljbHkgZXhwcmVzc2VzIGEgZGVzaXJlIHRvIGJlIHRyYWRlZCB0byBhbm90aGVyIFRlYW0gc2hhbGwgYmUgaW4gdmlvbGF0aW9uIG9mIHRoaXMgU2VjdGlvbiAxLgpTZWN0aW9uIDIuCgpQbGF5ZXIgRGlzY2lwbGluZS4KKGEpCgpJbiBhZGRpdGlvbiB0byBhbnkgb3RoZXIgcmlnaHRzIGl0IGhhcyB1bmRlciB0aGlzIEFncmVlbWVudCBhbmQgdGhlCgpTdGFuZGFyZCBQbGF5ZXIgQ29udHJhY3QsIHRoZSBXTkJBIGFuZC9vciBhIFRlYW0gbWF5IGltcG9zZSByZWFzb25hYmxlIGRpc2NpcGxpbmUgb24gYQpwbGF5ZXIgZm9yIGFueSBhY3Qgb3Igb21pc3Npb24gdGhhdCBmYWlscyB0byBjb25mb3JtIHRvIHRoZSByZXF1aXJlbWVudHMgc2V0IGZvcnRoIGluIFNlY3Rpb24gMQphYm92ZS4gU3VjaCBkaXNjaXBsaW5lIG1heSBpbmNsdWRlIHJlYXNvbmFibGUgZmluZXMgYW5kL29yIHN1c3BlbnNpb25zLgooYikKClRoZSBXTkJBIGFuZCB0aGUgVGVhbSBzaGFsbCBub3QgZGlzYwoKPT09IEFydF9YSUlJID09PQpBUlRJQ0xFIFhJSUkKUExBWUVSIEVMSUdJQklMSVRZIEFORCBXTkJBIERSQUZUClNlY3Rpb24gMS4KClBsYXllciBFbGlnaWJpbGl0eS4KKGEpCgpPbmx5IHBsYXllcnMgd2hvIGFyZSB3b21lbiBhcmUgZWxpZ2libGUgdG8gcGxheSBpbiB0aGUgV05CQS4KCihiKQoKQSBwbGF5ZXIgaXMgZWxpZ2libGUgdG8gYmUgc2VsZWN0ZWQgaW4gdGhlIFdOQkEgRHJhZnQgaWYgc2hlOiAoaSkgd2lsbCBiZSBhdAoKbGVhc3QgdHdlbnR5LXR3byAoMjIpIHllYXJzIG9sZCBkdXJpbmcgdGhlIGNhbGVuZGFyIHllYXIgaW4gd2hpY2ggc3VjaCBEcmFmdCBpcyBoZWxkIGFuZCBzaGUKZWl0aGVyIGhhcyBubyByZW1haW5pbmcgaW50ZXJjb2xsZWdpYXRlIGVsaWdpYmlsaXR5IG9yIHJlbm91bmNlcyBoZXIgcmVtYWluaW5nIGludGVyY29sbGVnaWF0ZQplbGlnaWJpbGl0eSBieSB3cml0dGVuIG5vdGljZSB0byB0aGUgV05CQSBhdCBsZWFzdCB0ZW4gKDEwKSBkYXlzIHByaW9yIHRvIHN1Y2ggRHJhZnQ7IChpaSkgaGFzCmdyYWR1YXRlZCBmcm9tIGEgZm91ci15ZWFyIGNvbGxlZ2Ugb3IgdW5pdmVyc2l0eSBwcmlvciB0byBzdWNoIERyYWZ0LCBvciDigJxpcyB0byBncmFkdWF0ZeKAnSBmcm9tCnN1Y2ggY29sbGVnZSBvciB1bml2ZXJzaXR5IHdpdGhpbiB0aGUgdGhyZWUgKDMpLW1vbnRoIHBlcmlvZCBmb2xsb3dpbmcgc3VjaCBEcmFmdCBhbmQgc2hlIGVpdGhlcgpoYXMgbm8gcmVtYWluaW5nIGludGVyY29sbGVnaWF0ZSBlbGlnaWJpbGl0eSBvciByZW5vdW5jZXMgaGVyIHJlbWFpbmluZyBpbnRlcmNvbGxlZ2lhdGUgZWxpZ2liaWxpdHkKYnkgd3JpdHRlbiBub3RpY2UgdG8gdGhlIFdOQkEgYXQgbGVhc3QgdGVuICgxMCkgZGF5cyBwcmlvciB0byBzdWNoIERyYWZ0IG9yIChpaWkpIGF0dGVuZGVkIGEgZm91cnllYXIgY29sbGVnZSBvciB1bml2ZXJzaXR5LCBoZXIgb3JpZ2luYWwgY2xhc3MgaW4gc3VjaCBjb2xsZWdlIG9yIHVuaXZlcnNpdHkgaGFzIGFscmVhZHkgYmVlbgpncmFkdWF0ZWQgb3Ig4oCcaXMgdG8gZ3JhZHVhdGXigJ0gd2l0aGluIHRoZSB0aHJlZSAoMyktbW9udGggcGVyaW9kIGZvbGxvd2luZyBzdWNoIERyYWZ0LCBhbmQgc2hlCmVpdGhlciBoYXMgbm8gcmVtYWluaW5nIGludGVyY29sbGVnaWF0ZSBlbGlnaWJpbGl0eSBvciByZW5vdW5jZXMgaGVyIHJlbWFpbmluZyBpbnRlcmNvbGxlZ2lhdGUKCj09PSBBcnRfSSA9PT0KQVJUSUNMRSBJCkRFRklOSVRJT05TCkFzIHVzZWQgaW4gdGhpcyBBZ3JlZW1lbnQsIHRoZSBmb2xsb3dpbmcgdGVybXMgc2hhbGwgaGF2ZSB0aGUgZm9sbG93aW5nCm1lYW5pbmdzOgooYSkKCuKAnEFkZGl0aW9uYWwgTWFya2V0aW5nIGFuZCBQcm9tb3Rpb25hbCBDb21wZW5zYXRpb27igJ0gbWVhbnMgdGhlCgpjb21wZW5zYXRpb24gaW4gVS5TLiBkb2xsYXJzIHRoYXQgaXMgcGFpZCBvciBwYXlhYmxlIHRvIGEgcGxheWVyIHB1cnN1YW50IHRvIGEgV05CQSBNYXJrZXRpbmcKYW5kIFByb21vdGlvbmFsIEFncmVlbWVudC4KKGIpCgrigJxBZ3JlZW1lbnTigJ0gbWVhbnMgdGhpcyBDb2xsZWN0aXZlIEJhcmdhaW5pbmcgQWdyZWVtZW50IGVmZmVjdGl2ZSBhcyBvZgoKTWFyY2ggMTksIDIwMjYuCihjKQoK4oCcQXV0aG9yaXplZCBXTkJBIEZvb3R3ZWFyIFN1cHBsaWVy4oCdIChvciDigJxBdXRob3JpemVkIEZvb3R3ZWFyCgpTdXBwbGllcuKAnSkgbWVhbnMgYW4gZW50aXR5IGdyYW50ZWQgdGhlIHJpZ2h0IGJ5IFdOQkEgRW50ZXJwcmlzZXMgdG8gb3V0Zml0IG9uZSBvciBtb3JlIFdOQkEKcGxheWVycyB3aXRoIGxvZ28taWRlbnRpZmllZCBiYXNrZXRiYWxsIGZvb3R3ZWFyIHRvIGJlIHdvcm4gZHVyaW5nIFdOQkEgZ2FtZXMuCihkKQoK4oCcQmFzZSBTYWxhcnnigJ0gbWVhbnMgdGhlIHNhbGFyeSB0aGF0IGlzIHNldCBmb3J0aCBpbiBFeGhpYml0IDEgdG8gYSBQbGF5ZXIKCkNvbnRyYWN0IHRoYXQgaXMgcGFpZCBvciBwYXlhYmxlIGluIFUuUy4gZG9sbGFycyB0byBhIFdOQkEgcGxheWVyIChpbmNsdWRpbmcgcGxheWVycyB3aG9zZQpQbGF5ZXIgQ29udHJhY3RzIGhhdmUgYmVlbiB0ZXJtaW5hdGVkKSBmb3IgcmVuZGVyaW5nIHNlcnZpY2VzIHVuZGVyIHN1Y2ggQ29udHJhY3QuCihlKQoK4oCcQm9uYSBGaWRlIEV4Y2x1c2l2ZSBFbmRvcnNlbWVudCBBZ3JlZW1lbnTigJ0gbWVhbnMgYSBiaW5kaW5nCgphZ3JlZW1lbnQgdGhhdDogKGkpIGlzIGJldHdlZW4gYSBwbGF5ZXIgYW5kIGEgQm9uYSBGaWRlIExpY2Vuc2VlIGF1dGhvcml6aW5nIG9yIGdyYW50aW5nIHRoZQpCb25hIEZpZGUgTGljZW5zZWUgdGhlIHJpZ2h0IHRvIHVzZSB0aGUgUGxheWVyIEF0dHJpYnV0ZXMgb2Ygc3VjaCBwbGF5ZXIgZXhjbHVzaXZlbHkgb24gb3IgaW4KY29ubmVjdGlvbiB3aXRoIGEgcHJvZHVjdCBvciBzZXJ2aWNlOyAoaWkpIHByb3ZpZGVzIGZvcgoKPT09IEFydF9YWCA9PT0KQVJUSUNMRSBYWApQSFlTSUNBTCBDT05ESVRJT04sIE1FRElDQUwgRVhBTUlOQVRJT05TIEFORCBJTkpVUklFUwpTZWN0aW9uIDEuCgpNZWRpY2FsIEV4YW1pbmF0aW9uLCBTdXBwbHkgb2YgSW5mb3JtYXRpb24sIGFuZCBGaXRuZXNzIG9mIFBsYXllci4KKGEpCgpVcG9uIHRoZSBzaWduaW5nIG9mIGEgU3RhbmRhcmQgUGxheWVyIENvbnRyYWN0IGFuZCBkdXJpbmcgZWFjaCB0cmFpbmluZwoKY2FtcCwgYSBwbGF5ZXIgc2hhbGwgc3VibWl0IHRvIGEgY29tcGxldGUgbWVkaWNhbCBleGFtaW5hdGlvbiBieSBhIHBoeXNpY2lhbiBkZXNpZ25hdGVkIGJ5IHRoZQpUZWFtICh0aGUg4oCcUGh5c2ljaWFu4oCdKS4gVXBvbiB0aGUgc2lnbmluZyBvZiBhIFN0YW5kYXJkIFBsYXllciBDb250cmFjdCwgYW5kIHVwb24gdGhlIHJlcXVlc3QKb2YgdGhlIFRlYW0sIGEgcGxheWVyIHNoYWxsIHByb3ZpZGUgYSBjb21wbGV0ZSBwcmlvciBtZWRpY2FsIGhpc3RvcnkgKGluY2x1ZGluZyBtZWRpY2FsIHJlY29yZHMpLgpJbiBhZGRpdGlvbiwgYSBwbGF5ZXIgc2hhbGwgcHJvdmlkZSBhIGNvbXBsZXRlIHByaW9yIG1lZGljYWwgaGlzdG9yeSAoaW5jbHVkaW5nIG1lZGljYWwgcmVjb3JkcykKcmVsYXRlZCB0byBhbnkgaW5qdXJ5IHN1c3RhaW5lZCAob3IgY29uZGl0aW9uIGFnZ3JhdmF0ZWQpIHdoaWxlIHBlcmZvcm1pbmcgYmFza2V0YmFsbC1yZWxhdGVkCnNlcnZpY2VzIGluIGNvbm5lY3Rpb24gd2l0aCBhbiBPZmYtU2Vhc29uIFBsYXlpbmcgT2JsaWdhdGlvbiBvciBmb3IgYW4gZW50aXR5IChlLmcuLCBuCgo9PT0gQXJ0X1hWID09PQpBUlRJQ0xFIFhWCkNJUkNVTVZFTlRJT04KU2VjdGlvbiAxLgoKR2VuZXJhbCBQcm9oaWJpdGlvbnMuCihhKQoKSXQgaXMgdGhlIGludGVudGlvbiBvZiB0aGUgcGFydGllcyB0aGF0IHRoZSBwcm92aXNpb25zIGFncmVlZCB0byBoZXJlaW4sCgppbmNsdWRpbmcsIHdpdGhvdXQgbGltaXRhdGlvbiwgdGhvc2UgcmVsYXRpbmcgdG8gdGhlIFNhbGFyeSBDYXAsIHRoZSBFeGNlcHRpb25zIHRvIHRoZSBTYWxhcnkgQ2FwLAp0aGUgUm9va2llIFNjYWxlLCBhbmQgZnJlZSBhZ2VuY3ksIGJlIGludGVycHJldGVkIHNvIGFzIHRvIHByZXNlcnZlIHRoZSBlc3NlbnRpYWwgYmVuZWZpdHMgYWNoaWV2ZWQKYnkgYm90aCBwYXJ0aWVzIHRvIHRoaXMgQWdyZWVtZW50LiBOZWl0aGVyIHRoZSBQbGF5ZXJzIEFzc29jaWF0aW9uIG9yIHRoZSBXTkJBLCBub3IgYW55IFRlYW0KKG9yIFRlYW0gQWZmaWxpYXRlKSBvciBwbGF5ZXIgKG9yIHBlcnNvbiBvciBlbnRpdHkgYWN0aW5nIHdpdGggYXV0aG9yaXR5IG9uIGJlaGFsZiBvZiBzdWNoIHBsYXllciksCnNoYWxsIGVudGVyIGludG8gYW55IGFncmVlbWVudCAoaW5jbHVkaW5nLCB3aXRob3V0IGxpbWl0YXRpb24sIGFueSBQbGF5ZXIgQ29udHJhY3QsIG9yIGFueQphbWVuZG1lbnQgb3IgZXh0ZW5zaW9uIHRoZXJlb2YpLCBvciB1bmRlcnRha2UgYW55IGFjdGlvbiBvciB0cmFuc2FjdGlvbiAoaW5jbHVkaW5nLCB3aXRob3V0CmxpbWl0YXRpb24sIHRoZSBhc3NpZ25tZW50IG9yIHRlcm1pbmF0aW9uIG9mIGEgUGxheWVyIENvbnRyYWN0KSwgd2hpY2ggaQoKPT09IEFydF9WSUlJID09PQpBUlRJQ0xFIFZJSUkKUk9PS0lFIFNDQUxFCihhKQoKVGhlIEJhc2UgU2FsYXJpZXMgc2V0IGZvcnRoIGluIGEgUm9va2llIFNjYWxlIENvbnRyYWN0IHNoYWxsIGJlIHRoZSBSb29raWUKClNjYWxlIEFtb3VudHMgYXBwbGljYWJsZSB0byBzdWNoIFJvb2tpZSBTY2FsZSBDb250cmFjdC4KKGIpCgpUaGUgZm9sbG93aW5nIFJvb2tpZSBTY2FsZSBBbW91bnRzIHNoYWxsIGJlIGFwcGxpY2FibGUgdG8gUm9va2llIFNjYWxlCgpDb250cmFjdHMgdGhhdCBjb21tZW5jZSB3aXRoIHRoZSAyMDI2IFNlYXNvbjoKUGljawoKMXN0IFllYXIKQmFzZSBTYWxhcnkKCjJuZCBZZWFyCkJhc2UgU2FsYXJ5CgozcmQgWWVhcgpCYXNlIFNhbGFyeQoKNHRoIFllYXIgT3B0aW9uCkJhc2UgU2FsYXJ5CgpGaXJzdCBSb3VuZCAtIFBpY2sgMQoKJDUwMCwwMDAKCiQ1MjAsMDAwCgokNTcyLDAwMAoKJDY0NiwzNjAKCkZpcnN0IFJvdW5kIC0gUGljayAyCgokNDY2LDkxMwoKJDQ4NSw1OTAKCiQ1MzQsMTQ5CgokNjAzLDU4OAoKRmlyc3QgUm91bmQgLSBQaWNrIDMKCiQ0MzYsMDE2CgokNDUzLDQ1NwoKJDQ5OCw4MDMKCiQ1NjMsNjQ3CgpGaXJzdCBSb3VuCgo9PT0gQXJ0X1hYWElJSSA9PT0KQVJUSUNMRSBYWFhJSUkKRVhQQU5TSU9OLCBDT05UUkFDVElPTiwKUk9TVEVSUywgTlVNQkVSIE9GIEdBTUVTLCBTRUFTT04gRk9PVFBSSU5UClNlY3Rpb24gMS4KCk51bWJlciBvZiBUZWFtcy4KKGEpCgpUaGUgV05CQSBhbmQgUGxheWVycyBBc3NvY2lhdGlvbiBhZ3JlZSB0aGF0IHRoZSBXTkJBIGhhcyB0aGUKCmFic29sdXRlIHJpZ2h0IGFuZCBkaXNjcmV0aW9uIHRvIGRldGVybWluZSB0aGUgbnVtYmVyIGFuZCBsb2NhdGlvbiBvZiBUZWFtcyB0aGF0IHdpbGwgcGFydGljaXBhdGUKaW4gdGhlIFdOQkEgZHVyaW5nIGFueSBTZWFzb24sIGluY2x1ZGluZywgd2l0aG91dCBsaW1pdGF0aW9uLCB0aGUgcmlnaHQgYW5kIGRpc2NyZXRpb24gdG8KaW5jcmVhc2Ugb3IgZGVjcmVhc2UgdGhlIG51bWJlciBvZiBUZWFtcyBpbiB0aGUgV05CQSBhdCBhbnkgdGltZS4gVGhlIFdOQkEgYW5kIHRoZQpQbGF5ZXJzIEFzc29jaWF0aW9uIGZ1cnRoZXIgYWdyZWUgdGhhdCB0aGUgV05CQSBhbmQgZWFjaCBXTkJBIFRlYW0gaGFzIHRoZSBhYnNvbHV0ZSByaWdodAphbmQgZGlzY3JldGlvbiB0byBjZWFzZSBvcGVyYXRpb25zIGF0IGFueSAKCj09PSBBcnRfSVggPT09CkFSVElDTEUgSVgKTUVSSVQgQk9OVVNFUwpTZWN0aW9uIDEuCgpQYXltZW50IG9mIE1lcml0IEJvbnVzZXMuCkR1cmluZyBlYWNoIFNlYXNvbiBjb3ZlcmVkIGJ5IHRoaXMgQWdyZWVtZW50LCB0aGUgV05CQSBhbmQvb3IgdGhlIFRlYW1zCgpzaGFsbCBwYXkgdGhlIG1lcml0IGJvbnVzZXMgc2V0IGZvcnRoIGluIFNlY3Rpb24gMiBiZWxvdy4gVG8gYmUgZWxpZ2libGUgdG8gZWFybiBhIFRlYW0gYm9udXMsIGEKcGxheWVyIG11c3QgYmUgdW5kZXIgYSBTdGFuZGFyZCBQbGF5ZXIgQ29udHJhY3Qgb24gdGhlIFJlZ3VsYXIgU2Vhc29uIHJvc3RlciBvZiB0aGUgYXBwbGljYWJsZQpUZWFtIG9uIHRoZSBsYXN0IGRheSBvZiB0aGUgUmVndWxhciBTZWFzb247IHByb3ZpZGVkLCBob3cKCj09PSBBcnRfSVYgPT09CkFSVElDTEUgSVYKTUFOQUdFTUVOVCBSSUdIVFMgQ0xBVVNFClRoZSBXTkJBIGFuZCBXTkJBIFRlYW1zIG1haW50YWluIGFuZCByZXNlcnZlIHRoZSByaWdodCB0byBtYW5hZ2UgYW5kCmRpcmVjdCB0aGVpciBvcGVyYXRpb25zIGluIGFueSBtYW5uZXIgd2hhdHNvZXZlciwgZXhjZXB0IGFzIGxpbWl0ZWQgYnkgdGhlIHByb3Zp"
+          CBA_REF = base64.b64decode(CBA_B64).decode('utf-8')
 
           client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
-          prompt = """Using the 2026 WNBA CBA, generate 10 quiz questions for an experienced WNBA front office professional.
+          prompt = """You are generating a daily quiz for a WNBA front office professional based ONLY on the 2026-2033 WNBA CBA provided below.
 
-          DISTRIBUTION: Article V (3 questions), Article VI (2), Article VII (2), Article X (1), Article XIV (1), rotating from Arts I/VIII/IX/XIII/XV/XX/XXXIII (1).
-          FORMAT: 8 multiple choice + 2 true/false. DIFFICULTY: Advanced — specific dollar figures, thresholds, edge cases, 2026 changes.
+QUESTION DISTRIBUTION (exactly):
+- Article V (Standard Player Contract): 3 questions — salary structures, protection types, contract rules, PDCs, supermax/standard max thresholds, pregnancy disability
+- Article VI (Free Agency): 2 questions — Core Players, Reserved Players, Restricted/Unrestricted FA, qualifying offers, offer sheets, moratorium
+- Article VII (Salary Cap): 2 questions — cap exceptions, team salary calculation, trade rules, extensions, guarantee payments, minimum team salary
+- Article X (Benefits): 1 question — health insurance, childcare, family planning, 401k, parental leave, mental health
+- Article XIV (Player Conduct): 1 question — fines, suspensions, holdouts, WNBA prioritization, gambling, firearms
+- One rotating question from: Art I (definitions), Art VIII (rookie scale), Art IX (merit bonuses), Art XIII (draft/eligibility), Art XV (circumvention), Art XX (medical), Art XXXIII (expansion)
 
-          Return ONLY a JSON array of 10 objects, each with: question, type (multiple_choice or true_false), options (array of 4 for MC), correct_answer (A/B/C/D; T/F: A=True B=False), explanation (1-3 sentences with article/section), article (e.g. Art. V §3)"""
+FORMAT: exactly 8 multiple choice + 2 true/false, mixed throughout (not all at end).
+DIFFICULTY: Advanced. Assume deep familiarity with the prior CBA. Focus on specific dollar figures, thresholds, timeframes, and what CHANGED in 2026. Every question must cite a specific article and section.
+
+CBA REFERENCE TEXT (2026-2033):
+""" + CBA_REF + """
+
+Return ONLY a valid JSON array of exactly 10 objects. No markdown fences, no preamble, no explanation.
+Each object must have exactly these keys:
+{
+  "question": "string",
+  "type": "multiple_choice" or "true_false",
+  "options": ["A text", "B text", "C text", "D text"],
+  "correct_answer": "A" or "B" or "C" or "D",
+  "explanation": "1-3 sentences citing the specific 2026-2033 CBA article and section number",
+  "article": "e.g. Art. V §7(a)"
+}
+For true_false: omit options array, correct_answer is "A" for True or "B" for False."""
 
           message = client.messages.create(
-              model="claude-haiku-4-5-20251001",
-              max_tokens=3000,
-              system="Output ONLY valid JSON array. No markdown, no preamble.",
+              model="claude-sonnet-4-6",
+              max_tokens=4000,
+              system="You are a precise WNBA CBA quiz generator. Output ONLY a valid JSON array. No markdown fences, no preamble, no explanation. Just the raw JSON array starting with [ and ending with ].",
               messages=[{"role": "user", "content": prompt}]
           )
 
@@ -43,83 +69,151 @@ jobs:
           if not raw:
               raise ValueError("Empty response from API")
           questions = json.loads(raw)
+
           date_str = datetime.now().strftime("%A, %B %-d, %Y")
 
           def build_html(questions, date_str):
               blocks = ""
               for i, q in enumerate(questions):
                   is_tf = q["type"] == "true_false"
-                  opts = [("A","True"),("B","False")] if is_tf else [(chr(65+j), o) for j,o in enumerate(q.get("options",[]))]
-                  opt_html = "".join(f'<div class="opt" data-val="{l}" onclick="pick(this,{i})"><span class="ol">{l}</span><span class="ot">{t}</span></div>' for l,t in opts)
-                  blocks += f'<div class="qc" id="qc{i}"><div class="qm"><span class="qn">Q{i+1}</span><span class="qa">{q.get("article","")}</span><span class="qt">{"T/F" if is_tf else "4-choice"}</span></div><div class="qtx">{q["question"]}</div><div class="opts">{opt_html}</div><div class="exp" id="exp{i}"><div class="el">CBA Reference</div>{q["explanation"]}</div></div>'
+                  opts = [("A", "True"), ("B", "False")] if is_tf else [(chr(65+j), o) for j, o in enumerate(q.get("options", []))]
+                  opts_html = "".join(
+                      f'<div class="opt" data-val="{l}" onclick="pick(this,{i})"><span class="opt-letter">{l}</span><span class="opt-text">{t}</span></div>'
+                      for l, t in opts
+                  )
+                  blocks += f'''
+                  <div class="q-card" id="qc{i}">
+                    <div class="q-meta">
+                      <span class="q-num">Q{i+1}</span>
+                      <span class="q-article">{q.get("article","")}</span>
+                      <span class="q-type">{"T / F" if is_tf else "4-choice"}</span>
+                    </div>
+                    <div class="q-text">{q["question"]}</div>
+                    <div class="options">{opts_html}</div>
+                    <div class="explanation" id="exp{i}">
+                      <div class="exp-label">CBA Reference</div>
+                      <div class="exp-text">{q["explanation"]}</div>
+                    </div>
+                  </div>'''
 
               answers_json = json.dumps([q["correct_answer"] for q in questions])
 
-              return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+              return f"""<!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>WNBA CBA Quiz — {date_str}</title>
+          <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
           <style>
           *{{box-sizing:border-box;margin:0;padding:0}}
-          body{{font-family:-apple-system,sans-serif;background:#f5f5f5;padding-bottom:60px}}
-          .hdr{{background:#000;padding:24px 20px 0}}
-          .ht{{font-size:26px;font-weight:700;color:#fff}}.ht span{{color:#c8102e}}
-          .hs{{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#ff0099;margin-bottom:6px}}
-          .hd{{font-size:11px;color:#555;margin-top:4px}}
-          .sb{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#222;margin-top:16px}}
-          .sc{{background:#111;padding:12px;text-align:center}}
-          .sn{{font-size:22px;font-weight:700;color:#fff}}.sn.hi{{color:#ff0099}}
-          .sl{{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:3px}}
-          .wrap{{padding:16px;max-width:600px;margin:0 auto}}
-          .qc{{background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:18px;margin-bottom:12px}}
-          .qm{{display:flex;align-items:center;gap:7px;margin-bottom:12px}}
-          .qn{{background:#c8102e;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px}}
-          .qa{{background:#f5f5f5;color:#555;font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e8e8e8}}
-          .qt{{margin-left:auto;font-size:10px;color:#bbb;text-transform:uppercase}}
-          .qtx{{font-size:15px;line-height:1.55;color:#111;font-weight:500;margin-bottom:14px}}
-          .opts{{display:flex;flex-direction:column;gap:7px}}
-          .opt{{display:flex;align-items:flex-start;gap:11px;padding:11px 13px;border:1px solid #e8e8e8;border-radius:8px;cursor:pointer;background:#fafafa}}
-          .opt.sel{{border-color:#c8102e;background:#fff8f8}}
-          .opt.cor{{border-color:#273103;background:#f5f7f0;cursor:default}}
-          .opt.inc{{border-color:#ffd0d0;background:#fff5f5;cursor:default}}
-          .opt.shc{{border-color:#273103;background:#f5f7f0;cursor:default}}
-          .ol{{font-size:11px;font-weight:700;color:#bbb;min-width:14px;padding-top:1px}}
-          .opt.sel .ol{{color:#c8102e}}.opt.cor .ol{{color:#273103}}.opt.inc .ol{{color:#c8102e}}.opt.shc .ol{{color:#273103}}
-          .ot{{font-size:14px;line-height:1.45;color:#333}}
-          .opt.cor .ot{{color:#273103;font-weight:600}}.opt.inc .ot{{color:#c8102e;text-decoration:line-through}}.opt.shc .ot{{color:#273103;font-weight:600}}
-          .exp{{display:none;margin-top:12px;padding:12px 14px;background:#f9f9f0;border-left:3px solid #273103;border-radius:0 7px 7px 0;font-size:13px;line-height:1.65;color:#444}}
-          .exp.show{{display:block}}.el{{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#273103;margin-bottom:5px}}
-          .fb{{display:none;padding:4px 0 8px}}.fb.show{{display:block}}
-          .fb button{{width:100%;padding:18px;background:#000;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit}}
-          .rc{{display:none;background:#000;border-radius:12px;padding:32px 24px;text-align:center;margin-top:4px}}
-          .rc.show{{display:block}}
-          .rs{{font-size:64px;font-weight:700;color:#fff}}.rs span{{color:#ff0099}}
-          .rm{{font-size:15px;color:#888;margin-top:12px}}
-          .nb{{margin-top:24px;padding:14px 28px;background:transparent;color:#cee5eb;border:1.5px solid #cee5eb;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}}
-          </style></head>
+          body{{font-family:"DM Sans",-apple-system,sans-serif;background:#f5f5f5;color:#111;padding-bottom:60px}}
+          .header{{background:#000;padding:28px 20px 0}}
+          .header-top{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}}
+          .header-title{{font-family:"DM Serif Display",serif;font-size:30px;color:#fff;line-height:1.1}}
+          .header-title span{{color:#c8102e}}
+          .header-sub{{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#ff0099;margin-bottom:6px}}
+          .header-date{{font-size:11px;color:#555;text-align:right;padding-top:4px}}
+          .scorebar{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#222;overflow:hidden}}
+          .score-cell{{background:#111;padding:12px;text-align:center}}
+          .score-num{{font-size:22px;font-weight:700;color:#fff;line-height:1}}
+          .score-num.hi{{color:#ff0099}}
+          .score-label{{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:3px}}
+          .container{{padding:16px;max-width:600px;margin:0 auto}}
+          .q-card{{background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:18px;margin-bottom:12px}}
+          .q-meta{{display:flex;align-items:center;gap:7px;margin-bottom:12px}}
+          .q-num{{background:#c8102e;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px}}
+          .q-article{{background:#f5f5f5;color:#555;font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;border:1px solid #e8e8e8}}
+          .q-type{{margin-left:auto;font-size:10px;color:#bbb;text-transform:uppercase;letter-spacing:0.5px}}
+          .q-text{{font-size:15px;line-height:1.55;color:#111;font-weight:500;margin-bottom:14px}}
+          .options{{display:flex;flex-direction:column;gap:7px}}
+          .opt{{display:flex;align-items:flex-start;gap:11px;padding:11px 13px;border:1px solid #e8e8e8;border-radius:8px;cursor:pointer;background:#fafafa;transition:all 0.1s;-webkit-tap-highlight-color:transparent}}
+          .opt:hover{{border-color:#c8102e;background:#fff8f8}}
+          .opt.correct{{border-color:#273103;background:#f5f7f0;cursor:default}}
+          .opt.incorrect{{border-color:#ffd0d0;background:#fff5f5;cursor:default}}
+          .opt.show-correct{{border-color:#273103;background:#f5f7f0;cursor:default}}
+          .opt.locked{{cursor:default}}
+          .opt-letter{{font-size:11px;font-weight:700;color:#bbb;min-width:14px;padding-top:1px;flex-shrink:0}}
+          .opt.correct .opt-letter{{color:#273103}}
+          .opt.incorrect .opt-letter{{color:#c8102e}}
+          .opt.show-correct .opt-letter{{color:#273103}}
+          .opt-text{{font-size:14px;line-height:1.45;color:#333}}
+          .opt.correct .opt-text{{color:#273103;font-weight:600}}
+          .opt.incorrect .opt-text{{color:#c8102e;text-decoration:line-through}}
+          .opt.show-correct .opt-text{{color:#273103;font-weight:600}}
+          .explanation{{display:none;margin-top:12px;padding:12px 14px;background:#f9f9f0;border-left:3px solid #273103;border-radius:0 7px 7px 0}}
+          .explanation.show{{display:block}}
+          .exp-label{{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#273103;margin-bottom:5px}}
+          .exp-text{{font-size:13px;line-height:1.65;color:#444}}
+          .finish-btn-wrap{{display:none;padding:4px 0 8px}}
+          .finish-btn-wrap.show{{display:block}}
+          .finish-btn{{width:100%;padding:18px;background:#000;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer}}
+          .result-card{{display:none;background:#000;border-radius:12px;padding:32px 24px;text-align:center;margin-top:4px}}
+          .result-card.show{{display:block}}
+          .result-score{{font-family:"DM Serif Display",serif;font-size:64px;color:#fff;line-height:1}}
+          .result-score span{{color:#ff0099}}
+          .result-msg{{font-size:15px;color:#888;margin-top:12px;line-height:1.5}}
+          </style>
+          </head>
           <body>
-          <div class="hdr"><div class="hs">Daily training</div><div class="ht">WNBA <span>CBA</span> Quiz</div><div class="hd">{date_str}</div>
-          <div class="sb"><div class="sc"><div class="sn hi" id="sc">0</div><div class="sl">Correct</div></div><div class="sc"><div class="sn" id="sa">0</div><div class="sl">Done</div></div><div class="sc"><div class="sn" id="sl">10</div><div class="sl">Left</div></div></div></div>
-          <div class="wrap">{blocks}
-          <div class="fb" id="fb"><button onclick="finish()">See My Score</button></div>
-          <div class="rc" id="rc"><div class="rs" id="rs"></div><div class="rm" id="rm"></div><button class="nb" onclick="location.reload()">New Quiz</button></div>
+          <div class="header">
+            <div class="header-top">
+              <div><div class="header-sub">Daily training</div><div class="header-title">WNBA <span>CBA</span> Quiz</div></div>
+              <div class="header-date">{date_str}</div>
+            </div>
+            <div class="scorebar">
+              <div class="score-cell"><div class="score-num hi" id="sc">0</div><div class="score-label">Correct</div></div>
+              <div class="score-cell"><div class="score-num" id="sa">0</div><div class="score-label">Done</div></div>
+              <div class="score-cell"><div class="score-num" id="sl">10</div><div class="score-label">Left</div></div>
+            </div>
+          </div>
+          <div class="container">
+          {blocks}
+          <div class="finish-btn-wrap" id="fb"><button class="finish-btn" onclick="finish()">See My Score</button></div>
+          <div class="result-card" id="rc"><div class="result-score" id="rs"></div><div class="result-msg" id="rm"></div></div>
           </div>
           <script>
           const A={answers_json},T=10;let done=new Set(),cc=0;
-          function pick(el,i){{if(done.has(i))return;done.add(i);const c=el.dataset.val,r=A[i];document.getElementById("qc"+i).querySelectorAll(".opt").forEach(o=>{{o.onclick=null;if(o.dataset.val===r)o.classList.add(c===r?"cor":"shc")}});if(c===r){{el.classList.add("cor");cc++;}}else el.classList.add("inc");document.getElementById("exp"+i).classList.add("show");upd();if(done.size===T){{const f=document.getElementById("fb");f.classList.add("show");setTimeout(()=>f.scrollIntoView({{behavior:"smooth",block:"nearest"}}),300);}}}}
-          function upd(){{document.getElementById("sc").textContent=cc;document.getElementById("sa").textContent=done.size;document.getElementById("sl").textContent=T-done.size;}}
-          function finish(){{const p=Math.round(cc/T*100),msgs=[[100,"Perfect. You know this CBA cold."],[90,"Excellent — nearly flawless."],[80,"Strong. A few edges to sharpen."],[70,"Solid. Review what you missed."],[60,"Getting there — keep grinding."],[0,"Use the explanations to level up."]],m=msgs.find(x=>p>=x[0])[1];document.getElementById("rs").innerHTML=cc+"<span>/"+T+"</span>";document.getElementById("rm").textContent=m;document.getElementById("rc").classList.add("show");document.getElementById("fb").classList.remove("show");setTimeout(()=>document.getElementById("rc").scrollIntoView({{behavior:"smooth"}}),100);}}
-          </script></body></html>"""
+          function pick(el,i){{if(done.has(i))return;done.add(i);const c=el.dataset.val,r=A[i];document.getElementById("qc"+i).querySelectorAll(".opt").forEach(o=>{{o.onclick=null;o.classList.add("locked");if(o.dataset.val===r)o.classList.add(c===r?"correct":"show-correct")}});if(c===r){{el.classList.add("correct");cc++;}}else el.classList.add("incorrect");document.getElementById("exp"+i).classList.add("show");document.getElementById("sc").textContent=cc;document.getElementById("sa").textContent=done.size;document.getElementById("sl").textContent=T-done.size;if(done.size===T){{const f=document.getElementById("fb");f.classList.add("show");setTimeout(()=>f.scrollIntoView({{behavior:"smooth",block:"nearest"}}),300);}}}}
+          function finish(){{const p=Math.round(cc/T*100),m=[[100,"Perfect. You know this CBA cold."],[90,"Excellent — nearly flawless."],[80,"Strong. A few edges to sharpen."],[70,"Solid. Review what you missed."],[60,"Getting there — keep grinding."],[0,"Use the explanations to level up."]].find(x=>p>=x[0])[1];document.getElementById("rs").innerHTML=cc+"<span>/"+T+"</span>";document.getElementById("rm").textContent=m;document.getElementById("rc").classList.add("show");document.getElementById("fb").classList.remove("show");setTimeout(()=>document.getElementById("rc").scrollIntoView({{behavior:"smooth"}}),100);}}
+          </script>
+          </body>
+          </html>"""
 
           html = build_html(questions, date_str)
 
-          msg = MIMEMultipart("alternative")
+          # Save as temp file
+          quiz_filename = f"wnba_cba_quiz_{datetime.now().strftime('%Y-%m-%d')}.html"
+          with open(f"/tmp/{quiz_filename}", "w") as f:
+              f.write(html)
+
+          # Build email with HTML attachment
+          msg = MIMEMultipart()
           msg["Subject"] = f"WNBA CBA Quiz — {date_str}"
           msg["From"] = os.environ["GMAIL_ADDRESS"]
           msg["To"] = "benpickman@yahoo.com"
-          msg.attach(MIMEText(html, "html"))
+
+          # Simple plain text body
+          body_text = f"""Your WNBA CBA Daily Quiz for {date_str} is attached.
+
+Open the attached HTML file in your browser (Safari or Chrome) to take the quiz.
+Tap an answer to reveal whether it is correct, and see the CBA reference.
+
+Good luck!"""
+
+          msg.attach(MIMEText(body_text, "plain"))
+
+          # Attach the HTML quiz file
+          with open(f"/tmp/{quiz_filename}", "rb") as f:
+              part = MIMEBase("application", "octet-stream")
+              part.set_payload(f.read())
+          encoders.encode_base64(part)
+          part.add_header("Content-Disposition", f"attachment; filename={quiz_filename}")
+          msg.attach(part)
 
           with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
               s.login(os.environ["GMAIL_ADDRESS"], os.environ["GMAIL_APP_PASSWORD"])
               s.send_message(msg)
 
-          print("Quiz sent successfully!")
+          print(f"Quiz sent successfully! {len(questions)} questions generated.")
           PYEOF
