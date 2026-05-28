@@ -9,10 +9,16 @@ jobs:
   send-quiz:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          ref: gh-pages
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install dependencies
         run: pip install anthropic --quiet
 
-      - name: Run quiz
+      - name: Generate and deploy quiz
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
@@ -24,8 +30,6 @@ jobs:
           from datetime import datetime
           from email.mime.multipart import MIMEMultipart
           from email.mime.text import MIMEText
-          from email.mime.base import MIMEBase
-          from email import encoders
 
           CBA_REF = base64.b64decode(os.environ["CBA_B64"]).decode("utf-8")
           client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
@@ -131,24 +135,35 @@ jobs:
               'setTimeout(()=>document.getElementById("rc").scrollIntoView({behavior:"smooth"}),100);}'
               '</script></body></html>')
 
-          fname = f"wnba_cba_quiz_{datetime.now().strftime('%Y-%m-%d')}.html"
-          with open(f"/tmp/{fname}", "w") as f:
+          # Write to index.html in current directory (gh-pages branch)
+          with open("index.html", "w") as f:
               f.write(html)
 
+          print(f"Quiz HTML written. {len(questions)} questions.")
+
+          # Send email with link
           msg = MIMEMultipart()
           msg["Subject"] = f"WNBA CBA Quiz - {date_str}"
           msg["From"] = os.environ["GMAIL_ADDRESS"]
           msg["To"] = "benpickman@yahoo.com"
-          msg.attach(MIMEText(f"Your WNBA CBA Quiz for {date_str} is attached.\n\nOpen the HTML file in Safari or Chrome.", "plain"))
-          with open(f"/tmp/{fname}", "rb") as f:
-              part = MIMEBase("application", "octet-stream")
-              part.set_payload(f.read())
-          encoders.encode_base64(part)
-          part.add_header("Content-Disposition", f"attachment; filename={fname}")
-          msg.attach(part)
+          msg.attach(MIMEText(
+              f"Your WNBA CBA Quiz for {date_str} is ready.\n\n"
+              "Tap the link below to open it in your browser:\n\n"
+              "https://benpickmanathletic-design.github.io/wnba-cba-quiz/\n\n"
+              "Good luck!",
+              "plain"))
 
           with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
               s.login(os.environ["GMAIL_ADDRESS"], os.environ["GMAIL_APP_PASSWORD"])
               s.send_message(msg)
-          print(f"Sent! {len(questions)} questions.")
+
+          print("Email sent!")
           EOF
+
+      - name: Commit and push quiz to gh-pages
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add index.html
+          git commit -m "Daily quiz $(date +'%Y-%m-%d')" || echo "Nothing to commit"
+          git push origin gh-pages
