@@ -38,7 +38,11 @@ jobs:
               messages=[{"role": "user", "content": prompt}]
           )
 
-          questions = json.loads(message.content[0].text)
+          raw = message.content[0].text.strip()
+          raw = raw.replace("```json", "").replace("```", "").strip()
+          if not raw:
+              raise ValueError("Empty response from API")
+          questions = json.loads(raw)
           date_str = datetime.now().strftime("%A, %B %-d, %Y")
 
           def build_html(questions, date_str):
