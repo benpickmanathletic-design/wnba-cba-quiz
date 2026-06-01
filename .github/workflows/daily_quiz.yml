@@ -15,6 +15,12 @@ jobs:
           ref: gh-pages
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Fetch CBA reference and question log from main
+        run: |
+          git fetch origin main
+          git checkout origin/main -- cba_reference.txt || echo "No CBA file yet"
+          git checkout origin/main -- asked_questions.json || echo "[]" > asked_questions.json
+
       - name: Install dependencies
         run: pip install anthropic --quiet
 
@@ -23,7 +29,6 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          CBA_B64: ${{ secrets.CBA_B64 }}
         run: |
           python3 - << 'EOF'
           import anthropic, smtplib, os, json, base64
@@ -31,17 +36,34 @@ jobs:
           from email.mime.multipart import MIMEMultipart
           from email.mime.text import MIMEText
 
-          CBA_REF = base64.b64decode(os.environ["CBA_B64"]).decode("utf-8")
+          # Load CBA reference
+          with open("cba_reference.txt") as f:
+              CBA_REF = base64.b64decode(f.read().strip()).decode("utf-8")
+
+          # Load question history
+          try:
+              with open("asked_questions.json") as f:
+                  asked = json.load(f)
+          except:
+              asked = []
+
+          # Keep last 60 questions for context
+          recent_questions = asked[-60:] if len(asked) > 60 else asked
+          history_str = ""
+          if recent_questions:
+              history_str = "\n\nDO NOT repeat or closely paraphrase any of these recently asked questions:\n" + "\n".join(f"- {q}" for q in recent_questions)
+
           client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
           prompt = ("You are generating a daily quiz for a WNBA front office professional "
               "based ONLY on the 2026-2033 WNBA CBA provided below.\n\n"
               "QUESTION DISTRIBUTION: Art V (3 questions), Art VI (2), Art VII (2), "
-              "Art X (1), Art XIV (1), one rotating from Arts I/VIII/IX/XIII/XV/XX/XXXIII.\n"
+              "Art X (1), Art XIV (1), one rotating from Arts I/VIII/IX/XI/XII/XIII/XV/XX/XXXIII/XXXIV.\n"
               "FORMAT: 8 multiple choice + 2 true/false mixed throughout.\n"
               "DIFFICULTY: Advanced. Specific dollar figures, thresholds, edge cases, "
-              "what CHANGED in 2026. Every question must cite a specific article and section.\n\n"
-              "CBA REFERENCE TEXT (2026-2033):\n" + CBA_REF +
+              "what CHANGED in 2026. Every question must cite a specific article and section.\n"
+              + history_str +
+              "\n\nCBA REFERENCE TEXT (2026-2033):\n" + CBA_REF +
               "\n\nReturn ONLY a valid JSON array of exactly 10 objects. No markdown. "
               "Each: question, type (multiple_choice or true_false), "
               "options (4-item array for MC only), correct_answer (A/B/C/D), "
@@ -56,6 +78,13 @@ jobs:
           questions = json.loads(raw)
           date_str = datetime.now().strftime("%A, %B %-d, %Y")
 
+          # Update question log
+          new_questions = [q["question"] for q in questions]
+          asked.extend(new_questions)
+          with open("asked_questions.json", "w") as f:
+              json.dump(asked, f, indent=2)
+
+          # Build HTML
           blocks = ""
           for i, q in enumerate(questions):
               is_tf = q["type"] == "true_false"
@@ -135,35 +164,41 @@ jobs:
               'setTimeout(()=>document.getElementById("rc").scrollIntoView({behavior:"smooth"}),100);}'
               '</script></body></html>')
 
-          # Write to index.html in current directory (gh-pages branch)
           with open("index.html", "w") as f:
               f.write(html)
-
           print(f"Quiz HTML written. {len(questions)} questions.")
 
-          # Send email with link
+          # Send email
           msg = MIMEMultipart()
           msg["Subject"] = f"WNBA CBA Quiz - {date_str}"
           msg["From"] = os.environ["GMAIL_ADDRESS"]
           msg["To"] = "benpickman@yahoo.com"
           msg.attach(MIMEText(
               f"Your WNBA CBA Quiz for {date_str} is ready.\n\n"
-              "Tap the link below to open it in your browser:\n\n"
-              "https://benpickmanathletic-design.github.io/wnba-cba-quiz/\n\n"
-              "Good luck!",
+              "Tap to open:\nhttps://benpickmanathletic-design.github.io/wnba-cba-quiz/\n\nGood luck!",
               "plain"))
-
           with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
               s.login(os.environ["GMAIL_ADDRESS"], os.environ["GMAIL_APP_PASSWORD"])
               s.send_message(msg)
-
           print("Email sent!")
           EOF
 
-      - name: Commit and push quiz to gh-pages
+      - name: Commit quiz and question log to gh-pages
         run: |
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
-          git add index.html
+          git add index.html asked_questions.json
           git commit -m "Daily quiz $(date +'%Y-%m-%d')" || echo "Nothing to commit"
           git push origin gh-pages
+
+      - name: Push question log back to main
+        run: |
+          git fetch origin main
+          git checkout origin/main -b main-temp
+          cp asked_questions.json /tmp/asked_questions.json
+          git checkout gh-pages
+          git checkout main-temp
+          cp /tmp/asked_questions.json asked_questions.json
+          git add asked_questions.json
+          git commit -m "Update question log $(date +'%Y-%m-%d')" || echo "Nothing to commit"
+          git push origin HEAD:main
