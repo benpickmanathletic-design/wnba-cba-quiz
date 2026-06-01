@@ -191,7 +191,7 @@ jobs:
           git commit -m "Daily quiz $(date +'%Y-%m-%d')" || echo "Nothing to commit"
           git push origin gh-pages
 
-      - - name: Push question log back to main
+      - name: Push question log back to main
         run: |
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
