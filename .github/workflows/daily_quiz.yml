@@ -191,14 +191,13 @@ jobs:
           git commit -m "Daily quiz $(date +'%Y-%m-%d')" || echo "Nothing to commit"
           git push origin gh-pages
 
-      - name: Push question log back to main
+      - - name: Push question log back to main
         run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
           git fetch origin main
-          git checkout origin/main -b main-temp
-          cp asked_questions.json /tmp/asked_questions.json
-          git checkout gh-pages
-          git checkout main-temp
-          cp /tmp/asked_questions.json asked_questions.json
+          git checkout main
+          git checkout gh-pages -- asked_questions.json
           git add asked_questions.json
           git commit -m "Update question log $(date +'%Y-%m-%d')" || echo "Nothing to commit"
-          git push origin HEAD:main
+          git push origin main
