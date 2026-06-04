@@ -172,7 +172,7 @@ jobs:
           msg = MIMEMultipart()
           msg["Subject"] = f"WNBA CBA Quiz - {date_str}"
           msg["From"] = os.environ["GMAIL_ADDRESS"]
-          msg["To"] = "benpickman@yahoo.com"
+          msg["To"] = "benpickman@yahoo.com, jlloyd@theportlandfire.com, vcernivec@theportlandfire.com"
           msg.attach(MIMEText(
               f"Your WNBA CBA Quiz for {date_str} is ready.\n\n"
               "Tap to open:\nhttps://benpickmanathletic-design.github.io/wnba-cba-quiz/\n\nGood luck!",
